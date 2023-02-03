@@ -3,7 +3,7 @@ name: Docker
 on:
   push:
     branches:
-      - master
+      - cdi9-22-cicd
     paths:
       - 'images/**/VERSION'
 jobs:
