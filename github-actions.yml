@@ -30,7 +30,7 @@ jobs:
 
       - name: Build and push the images
         run: |
-          for versionFilePath in $(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} ${{ github.event.before }} | grep "VERSION");
+          for versionFilePath in $(git diff-tree --no-commit-id --name-status -r ${{ github.sha }} ${{ github.event.before }} | grep '^[^D].*VERSION' | cut -f 2 );
           do
             folder=${versionFilePath%"/VERSION"}
             IMAGE_NAME=${folder##*/}
