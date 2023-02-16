@@ -30,10 +30,15 @@ jobs:
 
       - name: Build and push the images
         run: |
+          echo "##Images Pushed" >> $GITHUB_STEP_SUMMARY
+          echo "| First Header  | Second Header |" >> $GITHUB_STEP_SUMMARY
+          echo "| ------------- | ------------- |" >> $GITHUB_STEP_SUMMARY
+
           for versionFilePath in $(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }} | grep 'VERSION' );
           do
             folder=${versionFilePath%"/VERSION"}
             IMAGE_NAME=${folder##*/}
+            echo "::group::$IMAGE_NAME"
 
             tmpName="image-$RANDOM"
             docker buildx build $folder --file $folder/Dockerfile --tag $tmpName
@@ -48,4 +53,7 @@ jobs:
               docker tag $tmpName $IMAGE_ID:$VERSION
               docker push $IMAGE_ID:$VERSION
             done < "$versionFilePath"
+
+            echo "| $IMAGE_ID | $(sed -z 's/\n/, /g;s/,$/\n/' $versionFilePath) |" >> $GITHUB_STEP_SUMMARY
+            echo "::endgroup::"
           done;
