@@ -30,8 +30,8 @@ jobs:
 
       - name: Build and push the images
         run: |
-          echo "##Images Pushed" >> $GITHUB_STEP_SUMMARY
-          echo "| First Header  | Second Header |" >> $GITHUB_STEP_SUMMARY
+          echo "## Images Pushed" >> $GITHUB_STEP_SUMMARY
+          echo "| Image  | Tags |" >> $GITHUB_STEP_SUMMARY
           echo "| ------------- | ------------- |" >> $GITHUB_STEP_SUMMARY
 
           for versionFilePath in $(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }} | grep 'VERSION' );
