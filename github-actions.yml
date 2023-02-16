@@ -40,9 +40,12 @@ jobs:
             IMAGE_ID=${{ vars.DOCKER_REGISTRY_URL }}/$IMAGE_NAME
             VERSION=$(cat $versionFilePath)
 
-            echo IMAGE_ID=$IMAGE_ID
-            echo VERSION=$VERSION
+            while IFS= read -r VERSION
+            do
+              echo IMAGE_ID=$IMAGE_ID
+              echo VERSION=$VERSION
 
-            docker tag $tmpName $IMAGE_ID:$VERSION
-            docker push $IMAGE_ID:$VERSION
+              docker tag $tmpName $IMAGE_ID:$VERSION
+              docker push $IMAGE_ID:$VERSION
+            done < "$versionFilePath"
           done;
