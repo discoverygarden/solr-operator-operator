@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     branches:
-      - cdi9-22-cicd
+      - main
     paths:
       - 'images/**/VERSION'
 jobs:
