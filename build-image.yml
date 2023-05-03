@@ -66,7 +66,7 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           context: images/${{ inputs.image-name }}
 
-      - name: Add summary header
+      - name: Create summary
         if: steps.check-tags.outputs.updated == 'true'
         run: |
           cat <<EOF >> $GITHUB_STEP_SUMMARY
