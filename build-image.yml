@@ -9,14 +9,16 @@ on:
         type: string
 
 jobs:
-  build-push:
+  tags:
     runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.check-tags.outputs.updated }}
+      tags: ${{ steps.tags.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
       - name: Check if image tags updated
         id: check-tags
         run: |
@@ -25,29 +27,9 @@ jobs:
             echo "updated=true" >> "$GITHUB_OUTPUT"
           else
             echo "updated=false" >> "$GITHUB_OUTPUT"
-            echo "No new versions of $IMAGE_NAME to push" >> $GITHUB_STEP_SUMMARY
           fi
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
-
-      - name: Set up QEMU
-        if: steps.check-tags.outputs.updated == 'true'
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        if: steps.check-tags.outputs.updated == 'true'
-        uses: docker/setup-buildx-action@v2
-
-      - name: Configure AWS credentials
-        if: steps.check-tags.outputs.updated == 'true'
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - name: Login to Amazon ECR
-        if: steps.check-tags.outputs.updated == 'true'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
       - name: Get tags
         if: steps.check-tags.outputs.updated == 'true'
         id: tags
@@ -58,16 +40,34 @@ jobs:
         env:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
           IMAGE_NAME: ${{ inputs.image-name }}
+
+  build-push:
+    runs-on: ubuntu-latest
+    needs: tags
+    if: needs.tags.outputs.updated == 'true'
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: Build and push
-        if: steps.check-tags.outputs.updated == 'true'
         uses: docker/build-push-action@v4
         with:
           push: true
-          tags: ${{ steps.tags.outputs.tags }}
-          context: images/${{ inputs.image-name }}
+          tags: ${{ needs.tags.outputs.tags }}
+          context: "{{defaultContext}}:images/${{ inputs.image-name }}"
 
       - name: Create summary
-        if: steps.check-tags.outputs.updated == 'true'
         run: |
           cat <<EOF >> $GITHUB_STEP_SUMMARY
           ## Images Pushed
@@ -77,5 +77,5 @@ jobs:
           EOF
         env:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
-          TAGS: ${{ steps.tags.outputs.tags }}
+          TAGS: ${{ needs.tags.outputs.tags }}
 
