@@ -1,0 +1,81 @@
+name: Build and Push Drupal Image
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: The name of the drupal image to build.
+        required: true
+        type: string
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if image tags updated
+        id: check-tags
+        run: |
+          files_changed=$(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }})
+          if grep "^images/$IMAGE_NAME/VERSION\$" <<< "$files_changed"; then
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "No new versions of $IMAGE_NAME to push" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          IMAGE_NAME: ${{ inputs.image-name }}
+
+      - name: Set up QEMU
+        if: steps.check-tags.outputs.updated == 'true'
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        if: steps.check-tags.outputs.updated == 'true'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Configure AWS credentials
+        if: steps.check-tags.outputs.updated == 'true'
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Login to Amazon ECR
+        if: steps.check-tags.outputs.updated == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Get tags
+        if: steps.check-tags.outputs.updated == 'true'
+        id: tags
+        run: |
+          echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
+          sed "s|^|$IMAGE_REPO:|" images/$IMAGE_NAME/VERSION >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
+          IMAGE_NAME: ${{ inputs.image-name }}
+      - name: Build and push
+        if: steps.check-tags.outputs.updated == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          context: images/${{ inputs.image-name }}
+
+      - name: Add summary header
+        if: steps.check-tags.outputs.updated == 'true'
+        run: |
+          cat <<EOF >> $GITHUB_STEP_SUMMARY
+          ## Images Pushed
+          | Image  | Tags |
+          | ------------- | ------------- |
+          | $IMAGE_REPO | $(awk -F ":" '{print $NF}' <<< "$TAGS" | sed -z 's/\n/, /g;s/, *$/\n/' ) |
+          EOF
+        env:
+          IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+

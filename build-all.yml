@@ -1,0 +1,47 @@
+name: Build all images
+
+permissions:
+  id-token: write
+  contents: read
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'images/**/VERSION'
+jobs:
+  activemq:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: activemq
+  alpaca:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: alpaca
+  cantaloupe:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: cantaloupe
+  crayfish:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: crayfish
+  drupal-base:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: drupal-base
+  drupal-dev:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: drupal-dev
+    needs: drupal-base
+  solr:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: solr
+  solr-ctda:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: solr-ctda
+    needs: solr
+
