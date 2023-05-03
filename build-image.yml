@@ -1,10 +1,10 @@
-name: Build and Push Drupal Image
+name: Build and Push Target Image
 
 on:
   workflow_call:
     inputs:
       image-name:
-        description: The name of the drupal image to build.
+        description: The name of the image to build.
         required: true
         type: string
 
