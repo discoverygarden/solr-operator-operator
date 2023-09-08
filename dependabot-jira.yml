@@ -1,0 +1,22 @@
+---
+name: Dependabot Pull-Request Ticket
+on: pull_request
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Create Issue
+        uses: discoverygarden/create-issue@v1
+        with:
+          project: IT
+          summary: "[${{ github.repository }}] Dependabot update"
+          description: |
+            Dependabot generated a PR to update a dependency.
+          transition: "Request QA Review"
+          deployment-instructions: "N/A"
+          jira-url: ${{ secrets.JIRA_BASE_URL }}
+          jira-user: ${{ secrets.JIRA_USER_EMAIL }}
+          jira-token: ${{ secrets.JIRA_API_TOKEN }}
+          slack-webhook: ${{ secrets.FEED_WORKFLOW_WEBHOOK }}
