@@ -35,10 +35,6 @@ jobs:
     with:
       image-name: drupal-dev
     needs: drupal-base
-  simplesaml:
-    uses: ./.github/workflows/build-image.yml
-    with:
-      image-name: simplesaml
   solr:
     uses: ./.github/workflows/build-image.yml
     with:
