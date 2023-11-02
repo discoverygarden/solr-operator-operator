@@ -30,11 +30,6 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: drupal-base
-  drupal-dev:
-    uses: ./.github/workflows/build-image.yml
-    with:
-      image-name: drupal-dev
-    needs: drupal-base
   solr:
     uses: ./.github/workflows/build-image.yml
     with:
