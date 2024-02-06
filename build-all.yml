@@ -30,6 +30,13 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: drupal-base
+  drupal-base-dev:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: drupal-base-dev
+      build-args: |
+        "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base:${{ fromJSON(needs.drupal-base.outputs.json-raw-tags)[0] }}"
+    needs: drupal-base
   solr:
     uses: ./.github/workflows/build-image.yml
     with:

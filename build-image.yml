@@ -7,6 +7,20 @@ on:
         description: The name of the image to build.
         required: true
         type: string
+      build-args:
+        description: Optional list of arguments to provide to the build.
+        required: false
+        type: string
+    outputs:
+      updated:
+        description: If we detected an update.
+        value: ${{ jobs.tags.outputs.updated }}
+      tags:
+        description: The "{image}:{tag}" image tags, if we detected an update.
+        value: ${{ jobs.tags.outputs.tags }}
+      json-raw-tags: ${{ jobs.tags.outputs.json-raw-tags }}
+        description: JSON list of tags in the order they appears in their given VERSION doc.
+        value: ${{ jobs.tags.outputs.json-raw-tags }}
 
 jobs:
   tags:
@@ -14,6 +28,7 @@ jobs:
     outputs:
       updated: ${{ steps.check-tags.outputs.updated }}
       tags: ${{ steps.tags.outputs.tags }}
+      json-raw-tags: ${{ steps.json-raw-tags.outputs.json-raw-tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -40,6 +55,23 @@ jobs:
         env:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
           IMAGE_NAME: ${{ inputs.image-name }}
+      - name: Get raw JSON tags
+        if: steps.check-tags.outputs.updated == 'true'
+        id: json-raw-tags
+        run: |
+          readarray -t TAGS < images/$IMAGE_NAME/VERSION
+          TXT=""
+          for tag in "${TAGS[@]}"; do
+            TXT+="\"$tag\","
+          done
+          echo 'json-raw-tags<<EOF' >> "$GITHUB_OUTPUT"
+          echo '[' >> "$GITHUB_OUTPUT"
+          echo ${TXT%,} >> "$GITHUB_OUTPUT"
+          echo ']' >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_NAME: ${{ inputs.image-name }}
+
 
   build-push:
     runs-on: ubuntu-latest
@@ -67,6 +99,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ needs.tags.outputs.tags }}
           context: "{{defaultContext}}:images/${{ inputs.image-name }}"
+          build-args: ${{ inputs.build-args }}
 
       - name: Create summary
         run: |
