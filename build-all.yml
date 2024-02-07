@@ -34,6 +34,7 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: drupal-base-dev
+      upstream-updated: ${{ needs.drupal-base.outputs.updated }}
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base:${{ fromJSON(needs.drupal-base.outputs.json-raw-tags)[0] }}"
     needs: drupal-base

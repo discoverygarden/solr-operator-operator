@@ -11,12 +11,17 @@ on:
         description: Optional list of arguments to provide to the build.
         required: false
         type: string
+      upstream-updated:
+        description: If the given image's VERSION is a symlink, can be easier just to receive the info from the given job.
+        required: false
+        type: string
+        default: 'false'
     outputs:
       updated:
         description: If we detected an update.
         value: ${{ jobs.tags.outputs.updated }}
       tags:
-        description: The "{image}:{tag}" image tags, if we detected an update.
+        description: The "{image}:{tag}" image tags.
         value: ${{ jobs.tags.outputs.tags }}
       json-raw-tags:
         description: JSON list of tags in the order they appears in their given VERSION doc.
@@ -46,7 +51,6 @@ jobs:
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
       - name: Get tags
-        if: steps.check-tags.outputs.updated == 'true'
         id: tags
         run: |
           echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
@@ -56,7 +60,6 @@ jobs:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
           IMAGE_NAME: ${{ inputs.image-name }}
       - name: Get raw JSON tags
-        if: steps.check-tags.outputs.updated == 'true'
         id: json-raw-tags
         run: |
           set -e
@@ -72,7 +75,7 @@ jobs:
   build-push:
     runs-on: ubuntu-latest
     needs: tags
-    if: needs.tags.outputs.updated == 'true'
+    if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true'
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
