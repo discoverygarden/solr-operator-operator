@@ -59,16 +59,12 @@ jobs:
         if: steps.check-tags.outputs.updated == 'true'
         id: json-raw-tags
         run: |
-          readarray -t TAGS < images/$IMAGE_NAME/VERSION
+          set -e
           TXT=""
-          for tag in "${TAGS[@]}"; do
+          while read tag ; do
             TXT+="\"$tag\","
-          done
-          echo 'json-raw-tags<<EOF' >> "$GITHUB_OUTPUT"
-          echo '[' >> "$GITHUB_OUTPUT"
-          echo ${TXT%,} >> "$GITHUB_OUTPUT"
-          echo ']' >> "$GITHUB_OUTPUT"
-          echo 'EOF' >> "$GITHUB_OUTPUT"
+          done < images/$IMAGE_NAME/VERSION
+          echo "json-raw-tags=[${TXT%,}]" >> "$GITHUB_OUTPUT"
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
 
