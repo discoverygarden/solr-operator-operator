@@ -18,7 +18,7 @@ on:
       tags:
         description: The "{image}:{tag}" image tags, if we detected an update.
         value: ${{ jobs.tags.outputs.tags }}
-      json-raw-tags: ${{ jobs.tags.outputs.json-raw-tags }}
+      json-raw-tags:
         description: JSON list of tags in the order they appears in their given VERSION doc.
         value: ${{ jobs.tags.outputs.json-raw-tags }}
 
