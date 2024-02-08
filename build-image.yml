@@ -27,7 +27,7 @@ on:
         description: JSON list of tags in the order they appears in their given VERSION doc.
         value: ${{ jobs.tags.outputs.json-raw-tags }}
       image-info:
-        description: Digest of the built image.
+        description: Info about the built image.
         value: ${{ jobs.build-push.image-info }}
 
 jobs:
