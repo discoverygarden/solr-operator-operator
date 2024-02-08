@@ -26,6 +26,9 @@ on:
       json-raw-tags:
         description: JSON list of tags in the order they appears in their given VERSION doc.
         value: ${{ jobs.tags.outputs.json-raw-tags }}
+      image-info:
+        description: Digest of the built image.
+        value: ${{ jobs.build-push.image-info }}
 
 jobs:
   tags:
@@ -76,6 +79,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: tags
     if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true'
+    outputs:
+      image-info: ${{ toJson(steps.image-build.outputs) }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -93,6 +98,7 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v4
+        id: image-build
         with:
           push: true
           platforms: linux/amd64,linux/arm64
