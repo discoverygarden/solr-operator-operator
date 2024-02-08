@@ -68,13 +68,13 @@ jobs:
           type=semver,pattern={{major}},value=$TAG
           EOT
           EOF >> "$GITHUB_OUTPUT"
-       - name: Get tags
-         id: meta
-         uses: docker/metadata-action@v5
-         with:
-           images: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
-           tags: ${{ steps.tag-structure.outputs.tags }}
-           flavor: ${{ inputs.image-flavor }}
+      - name: Get tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
+          tags: ${{ steps.tag-structure.outputs.tags }}
+          flavor: ${{ inputs.image-flavor }}
 
   build-push:
     runs-on: ubuntu-latest
