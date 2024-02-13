@@ -1,5 +1,8 @@
 name: Build and Push Target Image
 
+permissions:
+  id-token: write
+  contents: read
 on:
   # For automated/reusable workflow calls.
   workflow_call:
