@@ -1,6 +1,7 @@
 name: Build and Push Target Image
 
 on:
+  # For automated/reusable workflow calls.
   workflow_call:
     inputs:
       image-name:
@@ -29,6 +30,34 @@ on:
       image-info:
         description: Info about the built image.
         value: ${{ jobs.build-push.image-info }}
+  # For manual invocations.
+  workflow_dispatch:
+    inputs:
+      image-name:
+        description: The name of the image to build.
+        required: true
+        type: choice
+        options:
+          - activemq
+          - alpaca
+          - cantaloupe
+          - crayfish
+          - drupal-base
+          - drupal-base-dev
+          - solr
+          - solr-ctda
+      build-args:
+        description: Optional list of arguments to provide to the build.
+        required: false
+        type: string
+      upstream-updated:
+        description: If the given image's VERSION is a symlink, can be easier just to receive the info from the given job.
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   tags:
