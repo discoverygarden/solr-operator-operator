@@ -37,7 +37,7 @@ jobs:
       upstream-updated: ${{ needs.drupal-base.outputs.updated }}
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base:@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
-      flavor: |
+      image-flavor: |
         suffix=-dev,onlatest=true
     needs: drupal-base
   solr:
