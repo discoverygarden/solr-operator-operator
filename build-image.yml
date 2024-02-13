@@ -1,6 +1,10 @@
 name: Build and Push Target Image
 
+permissions:
+  id-token: write
+  contents: read
 on:
+  # For automated/reusable workflow calls.
   workflow_call:
     inputs:
       image-name:
@@ -33,6 +37,34 @@ on:
       meta-json:
         description: Build tag/meta info, as per `docker/metadata-action`'s `json` output.
         value: ${{ jobs.tags.outputs.meta-json }}
+  # For manual invocations.
+  workflow_dispatch:
+    inputs:
+      image-name:
+        description: The name of the image to build.
+        required: true
+        type: choice
+        options:
+          - activemq
+          - alpaca
+          - cantaloupe
+          - crayfish
+          - drupal-base
+          - drupal-base-dev
+          - solr
+          - solr-ctda
+      build-args:
+        description: Optional list of arguments to provide to the build.
+        required: false
+        type: string
+      upstream-updated:
+        description: If the given image's VERSION is a symlink, can be easier just to receive the info from the given job.
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   tags:
