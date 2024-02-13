@@ -93,13 +93,13 @@ jobs:
         id: tag-structure
         run: |
           head -n1 images/${{ inputs.image-name }}/VERSION | read TAG
-          cat - <<EOF
+          cat - >> "$GITHUB_OUTPUT" <<EOF
           tags<<EOT
           type=semver,pattern={{version}},value=$TAG
           type=semver,pattern={{major}}.{{minor}},value=$TAG
           type=semver,pattern={{major}},value=$TAG
           EOT
-          EOF >> "$GITHUB_OUTPUT"
+          EOF
       - name: Get tags
         id: meta
         uses: docker/metadata-action@v5
