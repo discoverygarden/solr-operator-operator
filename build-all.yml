@@ -38,7 +38,7 @@ jobs:
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base:@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
       flavor: |
-        suffix=-dev
+        suffix=-dev,onlatest=true
     needs: drupal-base
   solr:
     uses: ./.github/workflows/build-image.yml
