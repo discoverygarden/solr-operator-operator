@@ -32,7 +32,7 @@ on:
         value: ${{ jobs.tags.outputs.json-raw-tags }}
       image-info:
         description: Info about the built image.
-        value: ${{ jobs.build-push.image-info }}
+        value: ${{ jobs.build-push.outputs.image-info }}
   # For manual invocations.
   workflow_dispatch:
     inputs:
