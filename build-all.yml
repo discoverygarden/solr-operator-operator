@@ -36,7 +36,7 @@ jobs:
       image-name: drupal-base-dev
       upstream-updated: ${{ needs.drupal-base.outputs.updated }}
       build-args: |
-        "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base:@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
+        "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
     needs: drupal-base
   solr:
     uses: ./.github/workflows/build-image.yml
