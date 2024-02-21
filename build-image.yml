@@ -1,12 +1,66 @@
 name: Build and Push Target Image
 
+permissions:
+  id-token: write
+  contents: read
 on:
+  # For automated/reusable workflow calls.
   workflow_call:
     inputs:
       image-name:
         description: The name of the image to build.
         required: true
         type: string
+      build-args:
+        description: Optional list of arguments to provide to the build.
+        required: false
+        type: string
+      upstream-updated:
+        description: If the given image's VERSION is a symlink, can be easier just to receive the info from the given job.
+        required: false
+        type: string
+        default: 'false'
+    outputs:
+      updated:
+        description: If we detected an update.
+        value: ${{ jobs.tags.outputs.updated }}
+      tags:
+        description: The "{image}:{tag}" image tags.
+        value: ${{ jobs.tags.outputs.tags }}
+      json-raw-tags:
+        description: JSON list of tags in the order they appears in their given VERSION doc.
+        value: ${{ jobs.tags.outputs.json-raw-tags }}
+      image-info:
+        description: Info about the built image.
+        value: ${{ jobs.build-push.outputs.image-info }}
+  # For manual invocations.
+  workflow_dispatch:
+    inputs:
+      image-name:
+        description: The name of the image to build.
+        required: true
+        type: choice
+        options:
+          - activemq
+          - alpaca
+          - cantaloupe
+          - crayfish
+          - drupal-base
+          - drupal-base-dev
+          - solr
+          - solr-ctda
+      build-args:
+        description: Optional list of arguments to provide to the build.
+        required: false
+        type: string
+      upstream-updated:
+        description: If the given image's VERSION is a symlink, can be easier just to receive the info from the given job.
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   tags:
@@ -14,6 +68,7 @@ jobs:
     outputs:
       updated: ${{ steps.check-tags.outputs.updated }}
       tags: ${{ steps.tags.outputs.tags }}
+      json-raw-tags: ${{ steps.json-raw-tags.outputs.json-raw-tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -31,7 +86,6 @@ jobs:
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
       - name: Get tags
-        if: steps.check-tags.outputs.updated == 'true'
         id: tags
         run: |
           echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
@@ -40,11 +94,25 @@ jobs:
         env:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
           IMAGE_NAME: ${{ inputs.image-name }}
+      - name: Get raw JSON tags
+        id: json-raw-tags
+        run: |
+          set -e
+          TXT=""
+          while read tag ; do
+            TXT+="\"$tag\","
+          done < images/$IMAGE_NAME/VERSION
+          echo "json-raw-tags=[${TXT%,}]" >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_NAME: ${{ inputs.image-name }}
+
 
   build-push:
     runs-on: ubuntu-latest
     needs: tags
-    if: needs.tags.outputs.updated == 'true'
+    if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true'
+    outputs:
+      image-info: ${{ toJson(steps.image-build.outputs) }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -56,17 +124,20 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: false
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and push
         uses: docker/build-push-action@v4
+        id: image-build
         with:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ needs.tags.outputs.tags }}
           context: "{{defaultContext}}:images/${{ inputs.image-name }}"
+          build-args: ${{ inputs.build-args }}
 
       - name: Create summary
         run: |
