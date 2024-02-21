@@ -30,6 +30,10 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: drupal-base
+  memcached:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      image-name: memcached
   solr:
     uses: ./.github/workflows/build-image.yml
     with:
