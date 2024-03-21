@@ -22,3 +22,4 @@ jobs:
           jira-user: ${{ vars.JIRA_USER_EMAIL }}
           jira-token: ${{ secrets.JIRA_API_TOKEN }}
           slack-webhook: ${{ secrets.FEED_WORKFLOW_WEBHOOK }}
+          guthub-token: ${{ github.token }}
