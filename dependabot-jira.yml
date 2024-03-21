@@ -1,6 +1,8 @@
 ---
 name: Dependabot Pull-Request Ticket
 on: pull_request
+permissions:
+  pull-requests: write
 
 jobs:
   dependabot:
