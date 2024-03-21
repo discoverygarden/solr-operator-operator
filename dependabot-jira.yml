@@ -16,7 +16,7 @@ jobs:
             Dependabot generated a PR to update a dependency.
           transition: "Request QA Review"
           deployment-instructions: "N/A"
-          jira-url: ${{ secrets.JIRA_BASE_URL }}
-          jira-user: ${{ secrets.JIRA_USER_EMAIL }}
+          jira-url: ${{ vars.JIRA_BASE_URL }}
+          jira-user: ${{ vars.JIRA_USER_EMAIL }}
           jira-token: ${{ secrets.JIRA_API_TOKEN }}
           slack-webhook: ${{ secrets.FEED_WORKFLOW_WEBHOOK }}
