@@ -32,6 +32,7 @@ jobs:
       image-name: drupal-base
   drupal-base-dev:
     uses: ./.github/workflows/build-image.yml
+    if: needs.drupal-base.outputs.updated == 'true'
     with:
       image-name: drupal-base-dev
       upstream-updated: ${{ needs.drupal-base.outputs.updated }}
