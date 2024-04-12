@@ -9,6 +9,11 @@ on:
       - main
     paths:
       - 'images/**/VERSION'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'images/**/VERSION'
 jobs:
   activemq:
     uses: ./.github/workflows/build-image.yml
