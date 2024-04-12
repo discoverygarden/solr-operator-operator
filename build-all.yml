@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     branches:
-      - main
+      [ main, adamcbowmanIT-286 ]
     paths:
       - 'images/**/VERSION'
   pull_request:
