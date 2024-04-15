@@ -10,8 +10,7 @@ on:
     paths:
       - 'images/**/VERSION'
   pull_request:
-    branches:
-      - main
+    branches: [ main, adamcbowmanIT-286 ]
     paths:
       - 'images/**/VERSION'
 jobs:
