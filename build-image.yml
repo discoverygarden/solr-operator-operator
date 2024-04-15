@@ -97,7 +97,8 @@ jobs:
             sed "s|^|$IMAGE_REPO:|" images/$IMAGE_NAME/VERSION >> "$GITHUB_OUTPUT"
             echo 'EOF' >> "$GITHUB_OUTPUT"
           else
-            echo 'tags=" ${{ github.sha }}"' >> "$GITHUB_OUTPUT"
+          # use the commit hash and PR name as the tags
+            echo 'tags=" ${{ github.sha }}", "pr-${{ github.event.number }}"' >> "$GITHUB_OUTPUT"   
           fi
         env:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
