@@ -102,10 +102,11 @@ jobs:
           # use the commit hash and PR name as the tags
             echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
             echo "$IMAGE_REPO:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-            echo "$IMAGE_REPO:pr-$GITHUB_REF_SLUG" >> "$GITHUB_OUTPUT"
+            echo "$IMAGE_REPO:PR-$PR_NUMBER" >> "$GITHUB_OUTPUT"
             echo 'EOF' >> "$GITHUB_OUTPUT"
           fi
         env:
+          PR_NUMBER: ${{ github.event.number }}
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
           IMAGE_NAME: ${{ inputs.image-name }}
       - name: Get raw JSON tags
