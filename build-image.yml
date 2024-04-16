@@ -70,6 +70,7 @@ on:
 jobs:
   tags:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
     outputs:
       updated: ${{ steps.check-tags.outputs.updated }}
       tags: ${{ steps.tags.outputs.tags }}
@@ -122,6 +123,7 @@ jobs:
 
   build-push:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
     needs: tags
     if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true' || github.event_name == 'pull_request'
     outputs:
