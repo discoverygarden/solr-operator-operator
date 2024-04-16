@@ -7,6 +7,11 @@ on:
   # For automated/reusable workflow calls.
   workflow_call:
     inputs:
+      env:
+        description: Environment for image push
+        required: false
+        type: string
+        default: ${{ github.event_name == 'pull_request' && 'DEV' || 'PROD' }}
       image-name:
         description: The name of the image to build.
         required: true
