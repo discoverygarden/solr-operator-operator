@@ -94,7 +94,7 @@ jobs:
       - name: Get tags
         id: tags
         run: |
-          if [ ${{ github.event_name }} == "push" ]; then
+          if [ ${{ github.event_name }} != "pull_request" ]; then
             echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
             sed "s|^|$IMAGE_REPO:|" images/$IMAGE_NAME/VERSION >> "$GITHUB_OUTPUT"
             echo 'EOF' >> "$GITHUB_OUTPUT"
@@ -102,6 +102,7 @@ jobs:
           # use the commit hash and PR name as the tags
             echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
             echo "$IMAGE_REPO:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "$IMAGE_REPO:pr-$GITHUB_REF_SLUG" >> "$GITHUB_OUTPUT"
             echo 'EOF' >> "$GITHUB_OUTPUT"
           fi
         env:
