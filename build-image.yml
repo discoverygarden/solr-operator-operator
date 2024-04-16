@@ -11,7 +11,7 @@ on:
         description: Environment for image push
         required: false
         type: string
-        default: ${{ github.event_name == 'pull_request' && 'DEV' || 'PROD' }}
+        default: ${{ github.event_name == 'pull_request' && 'dev' || 'prod' }}
       image-name:
         description: The name of the image to build.
         required: true
