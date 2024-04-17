@@ -5,10 +5,9 @@ permissions:
   contents: read
 on:
   push:
-    branches:
-      [ main, adamcbowmanIT-286 ]
+    branches: [ main, adamcbowmanIT-286 ]
     paths:
-      - 'images/**/VERSION'
+     - 'images/**/VERSION'
   pull_request:
     branches: [ main, adamcbowmanIT-286 ]
     paths:
