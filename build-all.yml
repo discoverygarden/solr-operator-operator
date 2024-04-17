@@ -53,13 +53,11 @@ jobs:
   solr-ctda:
     uses: ./.github/workflows/build-image.yml
     with:
-      #if env is dev, login to PROD registry and pull the image from there
+      #TODO: add pull role to aws to pull updated base image from prod registry
       image-name: solr-ctda
       build-args: |
-        # only do this if base image is updated
         if [ "${{ needs.solr.outputs.updated }}" == "true" ]; then
           echo "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/solr@${{ fromJSON(needs.solr.outputs.image-info).digest }}"
         fi
-        #TODO: add pull role to aws to pull updated base image from prod registry
     needs: solr
 
