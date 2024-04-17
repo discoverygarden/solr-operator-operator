@@ -157,7 +157,7 @@ jobs:
         uses: docker/build-push-action@v4
         id: image-build
         with:
-          push: true
+          push: false
           platforms: linux/amd64,linux/arm64
           tags: ${{ needs.tags.outputs.tags }}
           context: "{{defaultContext}}:images/${{ inputs.image-name }}"
