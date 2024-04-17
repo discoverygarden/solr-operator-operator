@@ -153,14 +153,14 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Configure AWS credentials
+      - name: Configure AWS prod credentials for pull
         if: ${{ inputs.env == 'dev' }}
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ vars.AWS_PROD_PULL_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           mask-aws-account-id: false
-      - name: Login to Amazon ECR
+      - name: Login to Amazon prod ECR for pull
         if: ${{ inputs.env == 'dev' }}
         id: login-prod-ecr
         uses: aws-actions/amazon-ecr-login@v1
