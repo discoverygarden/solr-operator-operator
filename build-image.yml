@@ -83,7 +83,15 @@ jobs:
       - name: Check if image tags updated
         id: check-tags
         run: |
-            files_changed=$(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }})
+            # Get the files changed - PUSH = diff between before and after, PR = diff between base and head
+            if [ ${{ github.event_name }} == "push" ]; then
+              files_changed=$(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }})
+            elif [ ${{ github.event_name }} == "pull_request" ]; then
+              git fetch origin ${{ github.event.pull_request.base.ref }}:base
+              git fetch origin ${{ github.event.pull_request.head.ref }}:pr
+              files_changed=$(git diff --name-only base pr)
+            fi
+            # Check if the VERSION file was updated
             if grep "^images/$IMAGE_NAME/VERSION\$" <<< "$files_changed"; then
               echo "updated=true" >> "$GITHUB_OUTPUT"
             else
