@@ -5,11 +5,11 @@ permissions:
   contents: read
 on:
   push:
-    branches: [ main, adamcbowmanIT-286 ]
+    branches: [ main ]
     paths:
      - 'images/**/VERSION'
   pull_request:
-    branches: [ main, adamcbowmanIT-286 ]
+    branches: [ main ] 
     paths:
       - '**'
 jobs:
