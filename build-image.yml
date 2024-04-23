@@ -134,7 +134,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.env }}
     needs: tags
-    if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true' || github.event_name == 'pull_request'
+    if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true'
     outputs:
       image-info: ${{ toJson(steps.image-build.outputs) }}
     steps:
