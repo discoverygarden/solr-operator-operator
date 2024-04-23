@@ -56,7 +56,7 @@ jobs:
     if: needs.solr.outputs.updated == 'true'
     with:
       image-name: solr-ctda
-      build-args: "BASE_IMAGE=${{ needs.solr.outputs.updated}}/solr@${{ fromJSON(needs.solr.outputs.image-info).digest }}"
+      build-args: "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/solr@${{ fromJSON(needs.solr.outputs.image-info).digest }}"
     needs: solr
   solr-ctda-base:
     # Build using the base image for solr-ctda if the solr image is not updated
