@@ -11,7 +11,7 @@ on:
   pull_request:
     branches: [ main ] 
     paths:
-      - '**'
+      - 'images/'
 jobs:
   activemq:
     uses: ./.github/workflows/build-image.yml
