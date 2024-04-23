@@ -50,13 +50,18 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: solr
-  solr-ctda:
+  solr-ctda-updated:
+    # Build using the updated image for solr-ctda if the solr image is updated
     uses: ./.github/workflows/build-image.yml
+    if: needs.solr.outputs.updated == 'true'
     with:
       image-name: solr-ctda
-      build-args: |
-        if [ "${{ needs.solr.outputs.updated }}" == "true" ]; then
-          echo "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/solr@${{ fromJSON(needs.solr.outputs.image-info).digest }}"
-        fi
+      build-args: "BASE_IMAGE=${{ needs.solr.outputs.updated}}/solr@${{ fromJSON(needs.solr.outputs.image-info).digest }}"
     needs: solr
-
+  solr-ctda-base:
+    # Build using the base image for solr-ctda if the solr image is not updated
+    uses: ./.github/workflows/build-image.yml
+    if: needs.solr.outputs.updated == 'false'
+    with:
+      image-name: solr-ctda
+    needs: solr
