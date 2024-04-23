@@ -9,7 +9,7 @@ on:
     paths:
      - 'images/**/VERSION'
   pull_request:
-    branches: [ main ] 
+    branches: [ main, adamcbowman/IT-286 ] 
     paths:
       - 'images/'
 jobs:
