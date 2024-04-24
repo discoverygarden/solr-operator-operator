@@ -95,7 +95,7 @@ jobs:
             if grep "^images/$IMAGE_NAME/VERSION\$" <<< "$files_changed"; then
               echo "updated=true" >> "$GITHUB_OUTPUT"
             # Check if anything in the image directory was updated for PR
-            elif [ ${{ github.event_name }} == "pull_request" ] && grep "^images/$IMAGE_NAME/*\$" <<< "$files_changed"; then
+            elif [ ${{ github.event_name }} == "pull_request" ] && grep "^images/$IMAGE_NAME" <<< "$files_changed"; then
               echo "updated=true" >> "$GITHUB_OUTPUT"
             else
               echo "updated=false" >> "$GITHUB_OUTPUT"
