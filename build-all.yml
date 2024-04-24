@@ -9,6 +9,7 @@ on:
     paths:
      - 'images/**/VERSION'
   pull_request:
+    # use dev environment for PRs
     branches: [ main, adamcbowman/IT-286 ] 
     paths:
       - 'images/**'
@@ -56,5 +57,5 @@ jobs:
       image-name: solr-ctda
       # use updated solr image if available, else pass empty string to use the default base image in the Dockerfile
       build-args: |
-        "BASE_IMAGE=${{ needs.solr.outputs.updated == 'true' && format('{0}/solr@{1}', vars.DOCKER_REGISTRY_URL, fromJson(needs.solr.outputs.image-info).digest) }}"
+        "${{ needs.solr.outputs.updated == 'true' && format('BASE_IMAGE={0}/solr@{1}', vars.DEV_DOCKER_REGISTRY_URL, fromJson(needs.solr.outputs.image-info).digest) || '' }}"
     needs: solr
