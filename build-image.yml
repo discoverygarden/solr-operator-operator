@@ -7,6 +7,11 @@ on:
   # For automated/reusable workflow calls.
   workflow_call:
     inputs:
+      env:
+        description: Environment for image push
+        required: false
+        type: string
+        default: ${{ github.event_name == 'pull_request' && 'dev' || 'prod' }}
       image-name:
         description: The name of the image to build.
         required: true
@@ -65,33 +70,54 @@ on:
 jobs:
   tags:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
     outputs:
       updated: ${{ steps.check-tags.outputs.updated }}
       tags: ${{ steps.tags.outputs.tags }}
       json-raw-tags: ${{ steps.json-raw-tags.outputs.json-raw-tags }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Check if image tags updated
         id: check-tags
         run: |
-          files_changed=$(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }})
-          if grep "^images/$IMAGE_NAME/VERSION\$" <<< "$files_changed"; then
-            echo "updated=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "updated=false" >> "$GITHUB_OUTPUT"
-          fi
+            # Get the files changed - PUSH = diff between before and after, PR = diff between base and head
+            if [ ${{ github.event_name }} == "push" ]; then
+              files_changed=$(git diff-tree --no-commit-id --name-only --diff-filter=d -r ${{ github.event.before }} ${{ github.sha }})
+            elif [ ${{ github.event_name }} == "pull_request" ]; then
+              git fetch origin ${{ github.event.pull_request.base.ref }}:base
+              git fetch origin ${{ github.event.pull_request.head.ref }}:pr
+              files_changed=$(git diff --name-only base pr)
+            fi
+            # Check if the VERSION file was updated
+            if grep "^images/$IMAGE_NAME/VERSION\$" <<< "$files_changed"; then
+              echo "updated=true" >> "$GITHUB_OUTPUT"
+            # Check if anything in the image directory was updated for PR
+            elif [ ${{ github.event_name }} == "pull_request" ] && grep "^images/$IMAGE_NAME/" <<< "$files_changed"; then
+              echo "updated=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "updated=false" >> "$GITHUB_OUTPUT"
+            fi
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
       - name: Get tags
         id: tags
         run: |
-          echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
-          sed "s|^|$IMAGE_REPO:|" images/$IMAGE_NAME/VERSION >> "$GITHUB_OUTPUT"
-          echo 'EOF' >> "$GITHUB_OUTPUT"
+          if [ ${{ github.event_name }} != "pull_request" ]; then
+            echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
+            sed "s|^|$IMAGE_REPO:|" images/$IMAGE_NAME/VERSION >> "$GITHUB_OUTPUT"
+            echo 'EOF' >> "$GITHUB_OUTPUT"
+          else
+          # use the commit hash and PR name as the tags
+            echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
+            echo "$IMAGE_REPO:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "$IMAGE_REPO:PR-$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo 'EOF' >> "$GITHUB_OUTPUT"
+          fi
         env:
+          PR_NUMBER: ${{ github.event.number }}
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
           IMAGE_NAME: ${{ inputs.image-name }}
       - name: Get raw JSON tags
@@ -109,6 +135,7 @@ jobs:
 
   build-push:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
     needs: tags
     if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true'
     outputs:
@@ -127,6 +154,18 @@ jobs:
           mask-aws-account-id: false
       - name: Login to Amazon ECR
         id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Configure AWS prod credentials for pull
+        if: ${{ inputs.env == 'dev' }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ vars.AWS_PROD_PULL_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: false
+      - name: Login to Amazon prod ECR for pull
+        if: ${{ inputs.env == 'dev' }}
+        id: login-prod-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and push

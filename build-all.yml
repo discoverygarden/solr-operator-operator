@@ -5,10 +5,13 @@ permissions:
   contents: read
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
-      - 'images/**/VERSION'
+     - 'images/**/VERSION'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'images/**'
 jobs:
   activemq:
     uses: ./.github/workflows/build-image.yml
@@ -51,5 +54,7 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: solr-ctda
+      # use updated solr image if available, else pass empty string to use the default base image in the Dockerfile
+      build-args: |
+        "${{ needs.solr.outputs.updated == 'true' && format('BASE_IMAGE={0}/solr@{1}', vars.DEV_DOCKER_REGISTRY_URL, fromJson(needs.solr.outputs.image-info).digest) || '' }}"
     needs: solr
-
