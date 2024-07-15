@@ -122,14 +122,15 @@ jobs:
           type=semver,pattern={{major}}.{{minor}},value=$TAG
           type=semver,pattern={{major}},value=$TAG
           EOT
+          EOF
           else
           cat - >> "$GITHUB_OUTPUT" <<EOF
           tags<<EOT
           type=sha
           type=ref,event=pr
           EOT
-          fi
           EOF
+          fi
       - name: Get tags
         id: meta
         uses: docker/metadata-action@v5
