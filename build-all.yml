@@ -46,11 +46,13 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     if: needs.drupal-base.outputs.updated == 'true' || github.event_name = "schedule"
     with:
-      image-name: drupal-base-dev
+      image-name: drupal-base
       upstream-updated: ${{ needs.drupal-base.outputs.updated }}
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
       scheduled: ${{ github.event_name == "schedule" }}
+      image-flavor: |
+        suffix=-dev,onlatest=true
     needs: drupal-base
   memcached:
     uses: ./.github/workflows/build-image.yml

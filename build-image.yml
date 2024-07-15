@@ -30,6 +30,10 @@ on:
         required: false
         type: string
         default: 'false'
+      image-flavor:
+        description: Image flavor, as per `docker/metadata-action`'s `flavor` input.
+        require: false
+        type: string
     outputs:
       updated:
         description: If we detected an update.
@@ -37,12 +41,12 @@ on:
       tags:
         description: The "{image}:{tag}" image tags.
         value: ${{ jobs.tags.outputs.tags }}
-      json-raw-tags:
-        description: JSON list of tags in the order they appears in their given VERSION doc.
-        value: ${{ jobs.tags.outputs.json-raw-tags }}
       image-info:
         description: Info about the built image.
         value: ${{ jobs.build-push.outputs.image-info }}
+      meta-json:
+        description: Build tag/meta info, as per `docker/metadata-action`'s `json` output.
+        value: ${{ jobs.tags.outputs.meta-json }}
   # For manual invocations.
   workflow_dispatch:
     inputs:
@@ -78,8 +82,8 @@ jobs:
     environment: ${{ inputs.env }}
     outputs:
       updated: ${{ steps.check-tags.outputs.updated }}
-      tags: ${{ steps.tags.outputs.tags }}
-      json-raw-tags: ${{ steps.json-raw-tags.outputs.json-raw-tags }}
+      tags: ${{ steps.meta.outputs.tags }}
+      meta-json: ${{ steps.meta.outputs.json }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,36 +111,32 @@ jobs:
             fi
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
-      - name: Get tags
-        id: tags
+      - name: Build tag structure
+        id: tag-structure
         run: |
           if [ ${{ github.event_name }} != "pull_request" ]; then
-            echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
-            sed "s|^|$IMAGE_REPO:|" images/$IMAGE_NAME/VERSION >> "$GITHUB_OUTPUT"
-            echo 'EOF' >> "$GITHUB_OUTPUT"
+          head -n1 images/${{ inputs.image-name }}/VERSION | read TAG
+          cat - >> "$GITHUB_OUTPUT" <<EOF
+          tags<<EOT
+          type=semver,pattern={{version}},value=$TAG
+          type=semver,pattern={{major}}.{{minor}},value=$TAG
+          type=semver,pattern={{major}},value=$TAG
+          EOT
           else
-          # use the commit hash and PR name as the tags
-            echo 'tags<<EOF' >> "$GITHUB_OUTPUT"
-            echo "$IMAGE_REPO:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-            echo "$IMAGE_REPO:PR-$PR_NUMBER" >> "$GITHUB_OUTPUT"
-            echo 'EOF' >> "$GITHUB_OUTPUT"
+          cat - >> "$GITHUB_OUTPUT" <<EOF
+          tags<<EOT
+          type=sha
+          type=ref,event=pr
+          EOT
           fi
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-          IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
-          IMAGE_NAME: ${{ inputs.image-name }}
-      - name: Get raw JSON tags
-        id: json-raw-tags
-        run: |
-          set -e
-          TXT=""
-          while read tag ; do
-            TXT+="\"$tag\","
-          done < images/$IMAGE_NAME/VERSION
-          echo "json-raw-tags=[${TXT%,}]" >> "$GITHUB_OUTPUT"
-        env:
-          IMAGE_NAME: ${{ inputs.image-name }}
-
+          EOF
+      - name: Get tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
+          tags: ${{ steps.tag-structure.outputs.tags }}
+          flavor: ${{ inputs.image-flavor }}
 
   build-push:
     runs-on: ubuntu-latest
