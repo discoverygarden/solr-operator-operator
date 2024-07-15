@@ -43,7 +43,7 @@ jobs:
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
       image-flavor: |
-        suffix=-dev,onlatest=true
+        prefix=dev-,onlatest=true
     needs: drupal-base
   memcached:
     uses: ./.github/workflows/build-image.yml
