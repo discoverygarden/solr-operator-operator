@@ -32,7 +32,7 @@ on:
         default: 'false'
       image-flavor:
         description: Image flavor, as per `docker/metadata-action`'s `flavor` input.
-        require: false
+        required: false
         type: string
     outputs:
       updated:
