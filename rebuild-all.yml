@@ -1,17 +1,17 @@
-name: Build all images
+name: Occasionally rebuild images
 
 permissions:
   id-token: write
   contents: read
 on:
-  push:
-    branches: [ main ]
-    paths:
-     - 'images/**/VERSION'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'images/**'
+  schedule:
+    - cron: '47 4 1 * *'
+defaults:
+  with:
+    scheduled: true
+    image-flavor: |
+      latest=true
+      suffix=-{{date 'YYYYMMDD'}},onlatest=false
 
 jobs:
   activemq:
@@ -20,6 +20,7 @@ jobs:
       image-name: activemq
   alpaca:
     uses: ./.github/workflows/build-image.yml
+    if: github.event_name != "schedule"
     with:
       image-name: alpaca
   cantaloupe:
@@ -36,28 +37,28 @@ jobs:
       image-name: drupal-base
   drupal-base-dev:
     uses: ./.github/workflows/build-image.yml
-    if: needs.drupal-base.outputs.updated == 'true'
     with:
       image-name: drupal-base
-      upstream-updated: ${{ needs.drupal-base.outputs.updated }}
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
       image-flavor: |
-        suffix=-dev,onlatest=true
+        latest=true
+        prefix=dev-,onlatest=true
+        suffix=-{{date 'YYYYMMDD'}},onlatest=false
     needs: drupal-base
   memcached:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: memcached
-  solr:
-    uses: ./.github/workflows/build-image.yml
-    with:
-      image-name: solr
-  solr-ctda:
-    uses: ./.github/workflows/build-image.yml
-    with:
-      image-name: solr-ctda
-      # use updated solr image if available, else pass empty string to use the default base image in the Dockerfile
-      build-args: |
-        "${{ needs.solr.outputs.updated == 'true' && format('BASE_IMAGE={0}/solr@{1}', vars.DEV_DOCKER_REGISTRY_URL, fromJson(needs.solr.outputs.image-info).digest) || '' }}"
-    needs: solr
+#  solr:
+#    uses: ./.github/workflows/build-image.yml
+#    with:
+#      image-name: solr
+#  solr-ctda:
+#    uses: ./.github/workflows/build-image.yml
+#    with:
+#      image-name: solr-ctda
+#      # use updated solr image if available, else pass empty string to use the default base image in the Dockerfile
+#      build-args: |
+#        "${{ needs.solr.outputs.updated == 'true' && format('BASE_IMAGE={0}/solr@{1}', vars.DEV_DOCKER_REGISTRY_URL, fromJson(needs.solr.outputs.image-info).digest) || '' }}"
+#    needs: solr
