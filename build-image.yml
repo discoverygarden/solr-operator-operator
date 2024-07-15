@@ -25,6 +25,11 @@ on:
         required: false
         type: string
         default: 'false'
+      scheduled:
+        description: If the present request is from a scheduled building.
+        required: false
+        type: string
+        default: 'false'
     outputs:
       updated:
         description: If we detected an update.
@@ -137,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.env }}
     needs: tags
-    if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true'
+    if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true' || inputs.scheduled == 'true'
     outputs:
       image-info: ${{ toJson(steps.image-build.outputs) }}
     steps:

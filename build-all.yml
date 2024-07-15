@@ -20,36 +20,43 @@ jobs:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: activemq
+      scheduled: ${{ github.event_name == "schedule" }}
   alpaca:
     uses: ./.github/workflows/build-image.yml
     if: github.event_name != "schedule"
     with:
       image-name: alpaca
+      scheduled: ${{ github.event_name == "schedule" }}
   cantaloupe:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: cantaloupe
+      scheduled: ${{ github.event_name == "schedule" }}
   crayfish:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: crayfish
+      scheduled: ${{ github.event_name == "schedule" }}
   drupal-base:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: drupal-base
+      scheduled: ${{ github.event_name == "schedule" }}
   drupal-base-dev:
     uses: ./.github/workflows/build-image.yml
-    if: needs.drupal-base.outputs.updated == 'true'
+    if: needs.drupal-base.outputs.updated == 'true' || github.event_name = "schedule"
     with:
       image-name: drupal-base-dev
       upstream-updated: ${{ needs.drupal-base.outputs.updated }}
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
+      scheduled: ${{ github.event_name == "schedule" }}
     needs: drupal-base
   memcached:
     uses: ./.github/workflows/build-image.yml
     with:
       image-name: memcached
+      scheduled: ${{ github.event_name == "schedule" }}
   solr:
     uses: ./.github/workflows/build-image.yml
     if: github.event_name != "schedule"
