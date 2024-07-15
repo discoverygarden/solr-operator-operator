@@ -46,10 +46,6 @@ jobs:
         prefix=dev-,onlatest=true
         suffix=-{{date 'YYYYMMDD'}},onlatest=false
     needs: drupal-base
-  memcached:
-    uses: ./.github/workflows/build-image.yml
-    with:
-      image-name: memcached
 #  solr:
 #    uses: ./.github/workflows/build-image.yml
 #    with:

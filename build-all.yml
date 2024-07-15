@@ -45,10 +45,6 @@ jobs:
       image-flavor: |
         prefix=dev-,onlatest=true
     needs: drupal-base
-  memcached:
-    uses: ./.github/workflows/build-image.yml
-    with:
-      image-name: memcached
   solr:
     uses: ./.github/workflows/build-image.yml
     with:
