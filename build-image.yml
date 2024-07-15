@@ -118,6 +118,7 @@ jobs:
           head -n1 images/${{ inputs.image-name }}/VERSION | read TAG
           cat - >> "$GITHUB_OUTPUT" <<EOF
           tags<<EOT
+          type=semver,pattern={{raw}},value=$TAG
           type=semver,pattern={{version}},value=$TAG
           type=semver,pattern={{major}}.{{minor}},value=$TAG
           type=semver,pattern={{major}},value=$TAG
