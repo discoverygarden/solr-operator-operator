@@ -12,6 +12,9 @@ on:
     branches: [ main ]
     paths:
       - 'images/**'
+  schedule:
+    - cron: '47 4 1 * *'
+
 jobs:
   activemq:
     uses: ./.github/workflows/build-image.yml
@@ -19,6 +22,7 @@ jobs:
       image-name: activemq
   alpaca:
     uses: ./.github/workflows/build-image.yml
+    if: github.event_name != "schedule"
     with:
       image-name: alpaca
   cantaloupe:
@@ -48,10 +52,12 @@ jobs:
       image-name: memcached
   solr:
     uses: ./.github/workflows/build-image.yml
+    if: github.event_name != "schedule"
     with:
       image-name: solr
   solr-ctda:
     uses: ./.github/workflows/build-image.yml
+    if: github.event_name != "schedule"
     with:
       image-name: solr-ctda
       # use updated solr image if available, else pass empty string to use the default base image in the Dockerfile
