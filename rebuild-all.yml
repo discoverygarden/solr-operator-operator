@@ -20,7 +20,6 @@ jobs:
       image-name: activemq
   alpaca:
     uses: ./.github/workflows/build-image.yml
-    if: github.event_name != "schedule"
     with:
       image-name: alpaca
   cantaloupe:
