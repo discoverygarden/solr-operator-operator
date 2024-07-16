@@ -8,6 +8,8 @@ on:
     - cron: '47 4 1 * *'
 defaults:
   with:
+    # XXX: confine to dev env, for now.
+    env: dev
     scheduled: true
     image-flavor: |
       latest=true
