@@ -81,7 +81,6 @@ on:
 
 jobs:
   tags:
-    name: Calculate tags for ${{ inputs.image-name }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.env }}
     outputs:
@@ -145,7 +144,6 @@ jobs:
           flavor: ${{ inputs.image-flavor }}
 
   build-push:
-    name: Buid and push ${{ inputs.image-name }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.env }}
     needs: tags
