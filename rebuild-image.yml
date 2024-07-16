@@ -45,6 +45,9 @@ on:
       image-info:
         description: Info about the built image.
         value: ${{ jobs.rebuild.outputs.image-info }}
+      image-names:
+        description: Specific names for built image.
+        value: ${{ jobs.rebuild.outputs.image-names }}
       meta-json:
         description: Build tag/meta info, as per `docker/metadata-action`'s `json` output.
         value: ${{ jobs.rebuild.outputs.meta-json }}
