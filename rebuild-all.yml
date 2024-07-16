@@ -6,56 +6,34 @@ permissions:
 on:
   schedule:
     - cron: '47 4 1 * *'
-defaults:
-  with:
-    # XXX: confine to dev env, for now.
-    env: dev
-    scheduled: true
-    image-flavor: |
-      latest=true
-      suffix=-{{date 'YYYYMMDD'}},onlatest=false
 
 jobs:
   activemq:
-    uses: ./.github/workflows/build-image.yml
+    uses: ./.github/workflows/rebuild-image.yml
     with:
       image-name: activemq
   alpaca:
-    uses: ./.github/workflows/build-image.yml
+    uses: ./.github/workflows/rebuild-image.yml
     with:
       image-name: alpaca
   cantaloupe:
-    uses: ./.github/workflows/build-image.yml
+    uses: ./.github/workflows/rebuild-image.yml
     with:
       image-name: cantaloupe
   crayfish:
-    uses: ./.github/workflows/build-image.yml
+    uses: ./.github/workflows/rebuild-image.yml
     with:
       image-name: crayfish
   drupal-base:
-    uses: ./.github/workflows/build-image.yml
+    uses: ./.github/workflows/rebuild-image.yml
     with:
       image-name: drupal-base
   drupal-base-dev:
-    uses: ./.github/workflows/build-image.yml
+    uses: ./.github/workflows/rebuild-image.yml
     with:
       image-name: drupal-base
       build-args: |
         "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
       image-flavor: |
-        latest=true
         prefix=dev-,onlatest=true
-        suffix=-{{date 'YYYYMMDD'}},onlatest=false
     needs: drupal-base
-#  solr:
-#    uses: ./.github/workflows/build-image.yml
-#    with:
-#      image-name: solr
-#  solr-ctda:
-#    uses: ./.github/workflows/build-image.yml
-#    with:
-#      image-name: solr-ctda
-#      # use updated solr image if available, else pass empty string to use the default base image in the Dockerfile
-#      build-args: |
-#        "${{ needs.solr.outputs.updated == 'true' && format('BASE_IMAGE={0}/solr@{1}', vars.DEV_DOCKER_REGISTRY_URL, fromJson(needs.solr.outputs.image-info).digest) || '' }}"
-#    needs: solr

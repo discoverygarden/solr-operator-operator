@@ -1,0 +1,64 @@
+---
+name: Rebuild and Push Target Image
+
+permissions:
+  id-token: write
+  contents: read
+on:
+  # For automated/reusable workflow calls.
+  workflow_call:
+    inputs:
+      env:
+        description: Environment for image push
+        required: false
+        type: string
+        default: dev
+      image-name:
+        description: The name of the image to build.
+        required: true
+        type: string
+      build-args:
+        description: Optional list of arguments to provide to the build.
+        required: false
+        type: string
+      upstream-updated:
+        description: If the given image's VERSION is a symlink, can be easier just to receive the info from the given job.
+        required: false
+        type: string
+        default: 'false'
+      scheduled:
+        description: If the present request is from a scheduled building.
+        required: false
+        type: string
+        default: 'true'
+      image-flavor:
+        description: Image flavor, as per `docker/metadata-action`'s `flavor` input.
+        required: false
+        type: string
+    outputs:
+      updated:
+        description: If we detected an update.
+        value: ${{ jobs.rebuild.outputs.updated }}
+      tags:
+        description: The "{image}:{tag}" image tags.
+        value: ${{ jobs.rebuild.outputs.tags }}
+      image-info:
+        description: Info about the built image.
+        value: ${{ jobs.rebuild.outputs.image-info }}
+      meta-json:
+        description: Build tag/meta info, as per `docker/metadata-action`'s `json` output.
+        value: ${{ jobs.rebuild.outputs.meta-json }}
+
+steps:
+  rebuild:
+    uses: ./.github/workflows/build-image.yml
+    with:
+      env: ${{ inputs.env }}
+      image-name: ${{ inputs.image-name }}
+      build-args: ${{ inputs.build-args }}
+      upstream-updated: ${{ inputs.upstream-updated }}
+      scheduled: ${{ inputs.scheduled }}
+      image-flavor: |
+        ${{ inputs.image-flavor }}
+        latest=true
+        suffix=-{{date 'YYYYMMDD'}},onlatest=false
