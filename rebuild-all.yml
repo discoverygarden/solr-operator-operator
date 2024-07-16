@@ -33,7 +33,7 @@ jobs:
     with:
       image-name: drupal-base
       build-args: |
-        "BASE_IMAGE=${{ vars.DOCKER_REGISTRY_URL }}/drupal-base@${{ fromJSON(needs.drupal-base.outputs.image-info).digest }}"
+        "BASE_IMAGE=${{ fromJSON(fromJSON(needs.drupal-base.outputs.image-names)['split'])[0] }}"
       image-flavor: |
         prefix=dev-,onlatest=true
     needs: drupal-base

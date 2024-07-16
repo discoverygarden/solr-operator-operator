@@ -44,6 +44,9 @@ on:
       image-info:
         description: Info about the built image.
         value: ${{ jobs.build-push.outputs.image-info }}
+      image-names:
+        description: Specific names for built image.
+        value: ${{ jobs.build-push.outputs.image-names }}
       meta-json:
         description: Build tag/meta info, as per `docker/metadata-action`'s `json` output.
         value: ${{ jobs.tags.outputs.meta-json }}
@@ -78,6 +81,7 @@ on:
 
 jobs:
   tags:
+    name: Calculate tags for ${{ inputs.image-name }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.env }}
     outputs:
@@ -141,12 +145,14 @@ jobs:
           flavor: ${{ inputs.image-flavor }}
 
   build-push:
+    name: Buid and push ${{ inputs.image-name }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.env }}
     needs: tags
     if: needs.tags.outputs.updated == 'true' || inputs.upstream-updated == 'true' || inputs.scheduled == 'true'
     outputs:
       image-info: ${{ toJson(steps.image-build.outputs) }}
+      image-names: ${{ toJson(steps.image-names.outputs) }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -184,6 +190,14 @@ jobs:
           tags: ${{ needs.tags.outputs.tags }}
           context: "{{defaultContext}}:images/${{ inputs.image-name }}"
           build-args: ${{ inputs.build-args }}
+
+      - name: Extract image names
+        id: image-names
+        run: |
+          cat <<EOF >> $GITHUB_OUTPUT
+          together=${{ fromJSON(steps.image-build.metadata)["image.name"] }}
+          split=$(echo '"${{ fromJSON(steps.image-build.metadata)["image.name"] }}"' | jq -c '. | split(",")')
+          EOF
 
       - name: Create summary
         run: |

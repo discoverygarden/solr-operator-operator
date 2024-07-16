@@ -51,6 +51,7 @@ on:
 
 steps:
   rebuild:
+    name: Rebuild and push ${{ inputs.image-name }}
     uses: ./.github/workflows/build-image.yml
     with:
       env: ${{ inputs.env }}
