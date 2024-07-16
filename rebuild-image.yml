@@ -49,7 +49,7 @@ on:
         description: Build tag/meta info, as per `docker/metadata-action`'s `json` output.
         value: ${{ jobs.rebuild.outputs.meta-json }}
 
-steps:
+jobs:
   rebuild:
     name: Rebuild and push ${{ inputs.image-name }}
     uses: ./.github/workflows/build-image.yml
