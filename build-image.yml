@@ -194,9 +194,11 @@ jobs:
       - name: Extract image names
         id: image-names
         run: |
+          METADATA="${{ steps.image-build.outputs.metadata }}"
+          TOGETHER=$(echo '$METADATA' | jq -c '.["image.name"]')
           cat <<EOF >> $GITHUB_OUTPUT
-          together=${{ fromJSON(steps.image-build.metadata)["image.name"] }}
-          split=$(echo '"${{ fromJSON(steps.image-build.metadata)["image.name"] }}"' | jq -c '. | split(",")')
+          together=$TOGETHER
+          split=$(echo '$TOGETHER' | jq -c '. | split(",")')
           EOF
 
       - name: Create summary
