@@ -9,6 +9,14 @@ jobs:
   update:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.semver.outputs.tag }}
     steps:
       - name: Run Auto Semver
+        id: semver
         uses: discoverygarden/auto-semver@v1
+  build:
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/build-image-from-tag-push.yml
+    with:
+      tag: ${{ jobs.update.outputs.tag }}
