@@ -18,9 +18,10 @@ jobs:
   build:
     if: github.event.pull_request.merged == true
     uses: ./.github/workflows/build-image-from-tag-push.yml
+    needs: update
     secrets: inherit
     permissions:
       id-token: write
       contents: read
     with:
-      tag: ${{ jobs.update.outputs.tag }}
+      tag: ${{ needs.update.outputs.tag }}
