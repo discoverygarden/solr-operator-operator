@@ -1,12 +1,12 @@
 ---
-name: Dependabot Pull-Request Ticket
+name: Bot Pull-Request to Ticket
 on: pull_request
 permissions:
   pull-requests: write
   repository-projects: read
 
 jobs:
-  dependabot:
+  bot-job:
     runs-on: ubuntu-latest
     if: ${{ github.actor == 'dependabot[bot]' || github.actor == 'renovate[bot]'}}
     steps:
