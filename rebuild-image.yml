@@ -11,8 +11,7 @@ on:
 
 jobs:
   build:
-    uses: ./.github/workflows/build-image.yml
+    uses: discoverygarden/docker-image-reusable-workflows/.github/workflows/build-image.yml@v1
     secrets: inherit
     with:
       image-name: ${{ vars.DOCKER_IMAGE_NAME }}
-
