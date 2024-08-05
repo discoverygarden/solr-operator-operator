@@ -55,7 +55,7 @@ jobs:
       - name: Last tag
         id: last-tag
         run: |
-          echo "value=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT" 
+          echo "value=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
       - name: Build tag structure
         id: tag-structure
         run: |
@@ -146,7 +146,6 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
-          context: "{{defaultContext}}:images/${{ inputs.image-name }}"
           build-args: ${{ inputs.build-args }}
 
       - name: Extract image names
@@ -169,5 +168,5 @@ jobs:
           EOF
         env:
           IMAGE_REPO: ${{ vars.DOCKER_REGISTRY_URL }}/${{ inputs.image-name }}
-          TAGS: ${{ needs.tags.outputs.tags }}
+          TAGS: ${{ steps.meta.outputs.tags }}
 
