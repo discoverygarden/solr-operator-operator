@@ -8,15 +8,15 @@ permissions:
 jobs:
   dependabot:
     runs-on: ubuntu-latest
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    if: ${{ github.actor == 'dependabot[bot]' || github.actor == 'renovate[bot]'}}
     steps:
       - name: Create Issue
         uses: discoverygarden/create-issue@v1
         with:
           project: IT
-          summary: "[${{ github.repository }}] Dependabot update"
+          summary: "[${{ github.repository }}] ${{ github.actor }} update"
           description: |
-            Dependabot generated a PR to update a dependency.
+            ${{ github.actor }} generated a PR to update a dependency.
           transition: "Request QA Review"
           deployment-instructions: "N/A"
           jira-url: ${{ vars.JIRA_BASE_URL }}
