@@ -16,7 +16,7 @@ jobs:
         id: semver
         uses: discoverygarden/auto-semver@v1
   build:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true && needs.update.outputs.tag
     uses: ./.github/workflows/build-image-from-tag-push.yml
     needs: update
     secrets: inherit
