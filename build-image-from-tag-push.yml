@@ -20,7 +20,7 @@ on:
 
 jobs:
   build:
-    if: (github.event_name == 'push' && github.event.push.created) || github.event_name == 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     uses: discoverygarden/docker-image-reusable-workflows/.github/workflows/build-image.yml@v1
     secrets: inherit
     with:
