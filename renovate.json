@@ -3,7 +3,7 @@
   "extends": [
     "local>discoverygarden/renovate-config"
   ],
-  "github-actions": [
+  "github-actions": {
     "fileMatch": [".*\\.ya?ml$"]
-  ]
+  }
 }
