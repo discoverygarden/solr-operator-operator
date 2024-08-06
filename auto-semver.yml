@@ -7,7 +7,7 @@ on:
       - main
 jobs:
   update:
-    if: github.event.pull_request.merged == true && "!contains(github.event.pull_request.labels.*.name, 'no-update')"
+    if: "github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'no-update')"
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.semver.outputs.tag }}
