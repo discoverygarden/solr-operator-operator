@@ -1,0 +1,12 @@
+dependencies:
+- name: solr-operator
+  repository: https://solr.apache.org/charts
+  version: 0.9.1
+- name: zookeeper
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 13.8.0
+- name: solr
+  repository: https://solr.apache.org/charts
+  version: 0.9.1
+digest: sha256:45be1bf55c8bbdb4f1786e1f137603fc634d9c121feef6c2bd3b32f99696d841
+generated: "2025-04-29T12:49:00.742185-03:00"

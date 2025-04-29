@@ -1,0 +1,19 @@
+---
+apiVersion: v2
+name: soo
+description: Solr Operator Operator
+version: 0.0.1-prerelease
+appVersion: 8.11.1
+dependencies:
+  - name: solr-operator
+    repository: https://solr.apache.org/charts
+    version: "0.9.1"
+    condition: install-dependencies
+  - name: zookeeper
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    version: "13.8.0"
+    condition: install-dependencies
+  - name: solr
+    repository: https://solr.apache.org/charts
+    version: "0.9.1"
+    condition: install-dependencies
