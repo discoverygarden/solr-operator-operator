@@ -29,16 +29,38 @@ type UserSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	SolrCloudRef SolrCloudRef `json:"solrCloudRef"`
+	Secret       SecretRef    `json:"secretRef"`
 }
 
+// Reference to the Solr Cloud instance in which to manage a user.
 type SolrCloudRef struct {
-	Name string `json:"name"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// Reference to a secret containing the username and password for the user.
+type SecretRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+	// Key in secret containing the username. Defaults to "username" for compatibility with kubernetes.io/basic-auth secrets.
+	UsernameKey string `json:"username-key,omitempty"`
+	// Key in secret containing the password. Defaults to "password" for compatibility with kubernetes.io/basic-auth secrets.
+	PasswordKey string `json:"password-key,omitempty"`
+}
+
+// Info about the hashed password and related salt, as used by Solr.
+type HashInfo struct {
+	Hash string `json:"hash,omitempty"`
+	Salt string `json:"salt,omitempty"`
 }
 
 // UserStatus defines the observed state of User.
 type UserStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	HashInfo HashInfo `json:"hash-info,omitempty"`
+	Username string   `json:"username"`
 }
 
 // +kubebuilder:object:root=true

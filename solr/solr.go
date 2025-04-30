@@ -17,92 +17,186 @@ type responseHeader struct {
 	QTime  int `json:"QTime"`
 }
 
+type authentication struct {
+	Credentials map[string]CredInfo `json:"credentials"`
+}
+
 type getUsersResp struct {
 	ResponseHeader responseHeader `json:"responseHeader"`
+	Enabled        bool           `json:"authentication.enabled"`
 	Authentication authentication `json:"authentication"`
 }
 
-type authentication struct {
-	Credentials map[string]string `json:"Credentials"`
+type CredInfo struct {
+	RawCreds string
+	RawHash  string
+	RawSalt  string
+	Hash     []byte
+	Salt     []byte
+}
+
+func (ci *CredInfo) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &ci.RawCreds)
+}
+
+func (ci *CredInfo) EnsureSplit() error {
+	if ci.Salt != nil {
+		// Salt is the last thing assigned. If already set, no need to reparse things.
+		return nil
+	}
+
+	parts := strings.Split(ci.RawCreds, " ")
+	part_count := len(parts)
+	if part_count != 2 {
+		return fmt.Errorf("cred string contained incorrect number of parts; got %d but expected %d", part_count, 2)
+	}
+	ci.RawHash = parts[0]
+	ci.RawSalt = parts[1]
+
+	hash, err := base64.StdEncoding.DecodeString(ci.RawHash)
+	if err != nil {
+		return fmt.Errorf("failed to base64 decode hash: %w", err)
+	} else {
+		ci.Hash = hash
+	}
+
+	salt, err := base64.StdEncoding.DecodeString(ci.RawSalt)
+	if err != nil {
+		return fmt.Errorf("failed to base64 decode salt: %w", err)
+	} else {
+		ci.Salt = salt
+	}
+
+	return nil
+}
+
+func (ci *CredInfo) CheckPassword(candidate string) (bool, error) {
+	if err := ci.EnsureSplit(); err != nil {
+		return false, fmt.Errorf("failed to parse creds: %w", err)
+	}
+
+	combinedBytes := append(ci.Salt, []byte(candidate)...)
+	round1 := sha256.Sum256(combinedBytes)
+	hash := sha256.Sum256(round1[:])
+
+	return bytes.Equal(ci.Hash, hash[:]), nil
 }
 
 type Client struct {
 	User     string
 	Password string
-	Host     string
-	Port     string
+	Endpoint string
 }
 
-func (c *Client) basicAuth() string {
-	auth := c.User + ":" + c.Password
-	return base64.StdEncoding.EncodeToString([]byte(auth))
-}
-
-func (c *Client) baseUrl() url.URL {
-	return url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", c.Host, c.Port),
-	}
-}
-
-func (c *Client) CreateUser(name, password string) error {
-	body := []byte(fmt.Sprintf("{\"set-user\": {\"%s\":\"%s\"}}", name, password))
-	reqURL := c.baseUrl()
-	reqURL.Path = "api/cluster/security/authentication"
-	req, err := http.NewRequest("POST", reqURL.String(), bytes.NewBuffer(body))
+func (c *Client) baseUrl() (*url.URL, error) {
+	URL, err := url.ParseRequestURI(c.Endpoint)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
-	req.Header.Add("Authorization", "Basic "+c.basicAuth())
-	req.Header.Add("Content-Type", "application/json")
+
+	return URL, nil
+}
+
+func (c *Client) NewRequest(method string, path string, body []byte, content_type string) (*http.Request, error) {
+	reqURL, err := c.baseUrl()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire base URL: %w", err)
+	}
+	reqURL = reqURL.JoinPath(path)
+
+	req, err := http.NewRequest(method, reqURL.String(), bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to build low-level request: %w", err)
+	}
+	req.SetBasicAuth(c.User, c.Password)
+	req.Header.Add("Content-Type", content_type)
+
+	return req, nil
+}
+
+type SetUsersMessage struct {
+	Users map[string]string `json:"set-user"`
+}
+type DeleteUsersMessage struct {
+	Users []string `json:"delete-user"`
+}
+
+func (c *Client) DoAuthPost(message []byte) error {
+	req, err := c.NewRequest(
+		"POST",
+		"api/cluster/security/authentication",
+		message,
+		"application/json",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build post request: %w", err)
+	}
 
 	httpClient := &http.Client{}
 	_, err = httpClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("http request failed: %w", err)
 	}
 	return nil
 }
 
-func (c *Client) CheckUser(username string, password string) (bool, error) {
-	creds, err := c.getCredentials()
+func (c *Client) CreateUser(name string, password string) error {
+	message, err := json.Marshal(SetUsersMessage{
+		Users: map[string]string{
+			name: password,
+		},
+	})
 	if err != nil {
-		return false, err
+		return fmt.Errorf("failed to generate json body for user creation message: %w", err)
 	}
-	combinedCred, ok := creds[username]
-	if !ok {
-		return false, nil
-	}
-	parts := strings.Split(combinedCred, " ")
-	if len(parts) != 2 {
-		return false, fmt.Errorf("Failed to split credential, should only contain 2 elements")
-	}
-	hash := parts[0]
-	salt := parts[1]
-	salt = strings.TrimRight(salt, "=")
-	saltBytes, err := base64.RawStdEncoding.DecodeString(salt)
-	if err != nil {
-		return false, err
-	}
-
-	return hash == genHash(password, saltBytes), nil
+	return c.DoAuthPost(message)
 }
 
-func (c *Client) getCredentials() (map[string]string, error) {
-	reqURL := c.baseUrl()
-	reqURL.Path = "api/cluster/security/authentication"
+func (c *Client) UpdateUser(name string, password string) error {
+	// Effectively an alias for CreateUser.
+	return c.CreateUser(name, password)
+}
 
-	req, err := http.NewRequest("GET", reqURL.String(), nil)
+func (c *Client) getCredentials(username string) (*CredInfo, bool, error) {
+	creds, err := c.getAllCredentials()
 	if err != nil {
-		return map[string]string{}, err
+		return nil, false, fmt.Errorf("failed to scrape solr creds for %s: %w", username, err)
 	}
-	req.Header.Add("Authorization", "Basic "+c.basicAuth())
-	req.Header.Add("Content-Type", "application/json")
+	info, ok := creds[username]
+	return &info, ok, nil
+}
+
+func (c *Client) CheckUserExistence(username string) (bool, error) {
+	_, ok, err := c.getCredentials(username)
+	return ok, err
+}
+
+func (c *Client) CheckUser(username string, password string) (bool, error) {
+	combinedCred, ok, err := c.getCredentials(username)
+	if err != nil {
+		return false, err
+	} else if !ok {
+		return false, nil
+	} else {
+		return combinedCred.CheckPassword(password)
+	}
+}
+
+func (c *Client) getAllCredentials() (map[string]CredInfo, error) {
+	req, err := c.NewRequest(
+		"GET",
+		"api/cluster/security/authentication",
+		nil,
+		"application/json",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build get request: %w", err)
+	}
 
 	httpClient := &http.Client{}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return map[string]string{}, err
+		return nil, fmt.Errorf("failed to perform get request: %w", err)
 	}
 
 	defer res.Body.Close()
@@ -110,23 +204,30 @@ func (c *Client) getCredentials() (map[string]string, error) {
 	if res.StatusCode != http.StatusOK {
 		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
-			return map[string]string{}, err
+			return nil, fmt.Errorf("failed to read (not-ok) response body: %w", err)
 		}
-		return map[string]string{}, fmt.Errorf("failed to get users: %s", string(bodyBytes))
+		return nil, fmt.Errorf("failed to get users: %s", bodyBytes)
+	}
+
+	response_body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	auth := &getUsersResp{}
-	err = json.NewDecoder(res.Body).Decode(auth)
+	err = json.Unmarshal(response_body, auth)
 	if err != nil {
-		return map[string]string{}, err
+		return nil, fmt.Errorf("failed to unmarshall json response: %w", err)
 	}
 	return auth.Authentication.Credentials, nil
 }
 
-func genHash(password string, salt []byte) string {
-	passwordBytes := []byte(password)
-	combinedBytes := append(salt, passwordBytes...)
-	round1 := sha256.Sum256(combinedBytes)
-	hashBytes := sha256.Sum256(round1[:])
-	return base64.StdEncoding.EncodeToString(hashBytes[:])
+func (c *Client) DeleteUser(name string) error {
+	message, err := json.Marshal(DeleteUsersMessage{
+		Users: []string{name},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to generate json body for user deletion message: %w", err)
+	}
+	return c.DoAuthPost(message)
 }
