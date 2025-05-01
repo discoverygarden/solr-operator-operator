@@ -12,19 +12,41 @@ import (
 	"strings"
 )
 
+const (
+	authenication_endpoint string = "api/cluster/security/authentication"
+	authorization_endpoint string = "solr/admin/authorization"
+	default_content_type   string = "application/json"
+)
+
 type responseHeader struct {
 	Status int `json:"status"`
 	QTime  int `json:"QTime"`
 }
 
 type authentication struct {
-	Credentials map[string]CredInfo `json:"credentials"`
+	BlockUnknown       bool                `json:"blockUnknown"`
+	Class              string              `json:"class"`
+	Credentials        map[string]CredInfo `json:"credentials"`
+	Realm              string              `json:"realm"`
+	ForwardCredentials bool                `json:"forwardCredentials"`
 }
 
 type getUsersResp struct {
 	ResponseHeader responseHeader `json:"responseHeader"`
 	Enabled        bool           `json:"authentication.enabled"`
 	Authentication authentication `json:"authentication"`
+}
+
+type authorization struct {
+	Class     string              `json:"class"`
+	UserRoles map[string][]string `json:"user-role"`
+	// Permissions []permission `json:"permissions"`
+}
+
+type getAuthResp struct {
+	ResponseHeader responseHeader `json:"responseHeader"`
+	Enabled        bool           `json:"authorization.enabled"`
+	Authorization  authorization  `json:"authorization"`
 }
 
 type CredInfo struct {
@@ -39,7 +61,7 @@ func (ci *CredInfo) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &ci.RawCreds)
 }
 
-func (ci *CredInfo) EnsureSplit() error {
+func (ci *CredInfo) ensureSplit() error {
 	if ci.Salt != nil {
 		// Salt is the last thing assigned. If already set, no need to reparse things.
 		return nil
@@ -70,8 +92,8 @@ func (ci *CredInfo) EnsureSplit() error {
 	return nil
 }
 
-func (ci *CredInfo) CheckPassword(candidate string) (bool, error) {
-	if err := ci.EnsureSplit(); err != nil {
+func (ci *CredInfo) checkPassword(candidate string) (bool, error) {
+	if err := ci.ensureSplit(); err != nil {
 		return false, fmt.Errorf("failed to parse creds: %w", err)
 	}
 
@@ -97,7 +119,7 @@ func (c *Client) baseUrl() (*url.URL, error) {
 	return URL, nil
 }
 
-func (c *Client) NewRequest(method string, path string, body []byte, content_type string) (*http.Request, error) {
+func (c *Client) newRequest(method string, path string, body []byte, content_type string) (*http.Request, error) {
 	reqURL, err := c.baseUrl()
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire base URL: %w", err)
@@ -121,12 +143,31 @@ type DeleteUsersMessage struct {
 	Users []string `json:"delete-user"`
 }
 
-func (c *Client) DoAuthPost(message []byte) error {
-	req, err := c.NewRequest(
+func (c *Client) DoAuthenticationPost(message []byte) error {
+	req, err := c.newRequest(
 		"POST",
-		"api/cluster/security/authentication",
+		authenication_endpoint,
 		message,
-		"application/json",
+		default_content_type,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build post request: %w", err)
+	}
+
+	httpClient := &http.Client{}
+	_, err = httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http request failed: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) DoAuthorizationPost(message []byte) error {
+	req, err := c.newRequest(
+		"POST",
+		authorization_endpoint,
+		message,
+		default_content_type,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to build post request: %w", err)
@@ -149,7 +190,7 @@ func (c *Client) CreateUser(name string, password string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate json body for user creation message: %w", err)
 	}
-	return c.DoAuthPost(message)
+	return c.DoAuthenticationPost(message)
 }
 
 func (c *Client) UpdateUser(name string, password string) error {
@@ -174,29 +215,69 @@ func (c *Client) CheckUserExistence(username string) (bool, error) {
 func (c *Client) CheckUser(username string, password string) (bool, error) {
 	combinedCred, ok, err := c.getCredentials(username)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to get credentials to check user: %w", err)
 	} else if !ok {
 		return false, nil
 	} else {
-		return combinedCred.CheckPassword(password)
+		return combinedCred.checkPassword(password)
 	}
 }
 
-func (c *Client) getAllCredentials() (map[string]CredInfo, error) {
-	req, err := c.NewRequest(
+func (c *Client) getAllRoles() (map[string][]string, error) {
+	req, err := c.newRequest(
 		"GET",
-		"api/cluster/security/authentication",
+		authorization_endpoint,
 		nil,
-		"application/json",
+		default_content_type,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build get request: %w", err)
+		return nil, fmt.Errorf("failed to build request for roles: %w", err)
 	}
 
 	httpClient := &http.Client{}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform get request: %w", err)
+		return nil, fmt.Errorf("failed to perform request for roles: %w", err)
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read (not-ok) response body: %w", err)
+		}
+		return nil, fmt.Errorf("failed to get users: %s", bodyBytes)
+	}
+
+	response_body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	auth := &getAuthResp{}
+	err = json.Unmarshal(response_body, auth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json response: %w", err)
+	}
+	return auth.Authorization.UserRoles, nil
+}
+
+func (c *Client) getAllCredentials() (map[string]CredInfo, error) {
+	req, err := c.newRequest(
+		"GET",
+		authenication_endpoint,
+		nil,
+		default_content_type,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request for credentials: %w", err)
+	}
+
+	httpClient := &http.Client{}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform request for credentials: %w", err)
 	}
 
 	defer res.Body.Close()
@@ -217,7 +298,7 @@ func (c *Client) getAllCredentials() (map[string]CredInfo, error) {
 	auth := &getUsersResp{}
 	err = json.Unmarshal(response_body, auth)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshall json response: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal json response: %w", err)
 	}
 	return auth.Authentication.Credentials, nil
 }
@@ -229,5 +310,100 @@ func (c *Client) DeleteUser(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate json body for user deletion message: %w", err)
 	}
-	return c.DoAuthPost(message)
+	return c.DoAuthenticationPost(message)
+}
+
+type set map[string]struct{}
+
+func (set set) add(value string) {
+	set[value] = struct{}{}
+}
+
+func (set set) addAll(values []string) {
+	for _, value := range values {
+		set.add(value)
+	}
+}
+
+func (set set) keySet() []string {
+	_keyset := []string{}
+
+	for key, _ := range set {
+		_keyset = append(_keyset, key)
+	}
+
+	return _keyset
+}
+
+func setify(values []string) map[string]struct{} {
+	_map := make(set)
+	_map.addAll(values)
+	return _map
+}
+
+var default_roles = []string{"admin", "k8s"}
+var default_roles_map = setify(default_roles)
+
+func (c *Client) GetRoles(name string) ([]string, error) {
+	all_assignments, err := c.getAllRoles()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get roles: %w", err)
+	}
+	roles, ok := all_assignments[name]
+	if ok {
+		return roles, nil
+	} else {
+		return []string{}, nil
+	}
+}
+
+func (c *Client) HasRoles(name string) (bool, error) {
+	roles, err := c.GetRoles(name)
+	if err != nil {
+		return false, fmt.Errorf("failed to check roles: %w", err)
+	}
+	setish := setify(roles)
+	for _, value := range default_roles {
+		_, ok := setish[value]
+		if !ok {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+type SetUserRoleMessage struct {
+	RoleMap map[string][]string `json:"set-user-role"`
+}
+
+func (c *Client) UpsertRoles(name string) error {
+	roles, err := c.GetRoles(name)
+	if err != nil {
+		return fmt.Errorf("failed to get roles during upsert: %w", err)
+	}
+	setish := set{}
+	setish.addAll(roles)
+	setish.addAll(default_roles)
+
+	message, err := json.Marshal(SetUserRoleMessage{
+		RoleMap: map[string][]string{
+			name: setish.keySet(),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to generate json body for user role update message: %w", err)
+	}
+	return c.DoAuthorizationPost(message)
+}
+
+func (c *Client) DeleteRoles(name string) error {
+	message, err := json.Marshal(SetUserRoleMessage{
+		RoleMap: map[string][]string{
+			name: nil,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to generate json body for user role delete message: %w", err)
+	}
+	return c.DoAuthorizationPost(message)
 }

@@ -28,20 +28,23 @@ type UserSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	SolrCloudRef SolrCloudRef `json:"solrCloudRef"`
-	Secret       SecretRef    `json:"secretRef"`
+	SolrCloudRef SolrCloudRef `json:"solrCloud"`
+	Secret       SecretRef    `json:"secret"`
+}
+
+type ObjectRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // Reference to the Solr Cloud instance in which to manage a user.
 type SolrCloudRef struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace,omitempty"`
+	Ref ObjectRef `json:"ref"`
 }
 
 // Reference to a secret containing the username and password for the user.
 type SecretRef struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace,omitempty"`
+	Ref ObjectRef `json:"ref"`
 	// Key in secret containing the username. Defaults to "username" for compatibility with kubernetes.io/basic-auth secrets.
 	UsernameKey string `json:"username-key,omitempty"`
 	// Key in secret containing the password. Defaults to "password" for compatibility with kubernetes.io/basic-auth secrets.

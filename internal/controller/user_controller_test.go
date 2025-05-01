@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
+	// +kubebuilder:scaffold:imports
 )
 
 var _ = Describe("User Controller", func() {
