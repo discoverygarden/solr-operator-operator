@@ -86,15 +86,6 @@ spec:
           status:
             description: UserStatus defines the observed state of User.
             properties:
-              hash-info:
-                description: Info about the hashed password and related salt, as used
-                  by Solr.
-                properties:
-                  hash:
-                    type: string
-                  salt:
-                    type: string
-                type: object
               username:
                 type: string
             required:

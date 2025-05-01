@@ -88,7 +88,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&user, FinaliserName) {
-			// TODO: Implement deletion
+			// Delete the user.
 			if res, err := r.reconcileUser(ctx, solrClient, &user, false); err != nil {
 				return res, fmt.Errorf("failed reconciling non-existence of %s/%s: %w", user.Namespace, user.Name, err)
 			}
@@ -126,6 +126,7 @@ func (r *UserReconciler) getClient(ctx context.Context, user *v1alpha1.User) (*s
 	ref := user.Spec.SolrCloudRef.Ref
 
 	return &solr.Client{
+		Context:  ctx,
 		User:     "admin",
 		Password: adminPassword,
 		Endpoint: fmt.Sprintf("http://%s-solrcloud-headless.%s:8983", ref.Name, getNamespace(user, user.Spec.SolrCloudRef.Ref)),
@@ -150,7 +151,7 @@ type Credentials struct {
 	Password string
 }
 
-func (r *UserReconciler) getCredentials(ctx context.Context, user *v1alpha1.User) (*Credentials, error) {
+func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1alpha1.User) *Credentials {
 	log := logf.FromContext(ctx)
 	var creds Credentials
 
@@ -179,6 +180,8 @@ func (r *UserReconciler) getCredentials(ctx context.Context, user *v1alpha1.User
 			// Log failure to acquire password from secret.
 			log.Info("failed to acquire password from secret", "coords", fmt.Sprintf("%s/%s:%s", secret.Namespace, secret.Name, password_key))
 		}
+	} else {
+		log.Error(err, "Failed to load secret.")
 	}
 	if creds.Username == "" {
 		if user.Status.Username != "" {
@@ -191,21 +194,18 @@ func (r *UserReconciler) getCredentials(ctx context.Context, user *v1alpha1.User
 			log.Info("fell back to use username from status", "found-username", creds.Username)
 		} else {
 			// Nothing to which to fallback; return nothing.
-			return nil, nil
+			return nil
 		}
 	}
 
-	return &creds, nil
+	return &creds
 }
 
 func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Client, user *v1alpha1.User, ensure_exists_state bool) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	creds, err := r.getCredentials(ctx, user)
-	if err != nil {
-		log.Error(err, "Failed to identify credentials.")
-		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to get credentials for %s/%s: %w", user.Namespace, user.Name, err)
-	} else if !ensure_exists_state && creds == nil {
+	creds := r.getCredentialsFromSecret(ctx, user)
+	if !ensure_exists_state && creds == nil {
 		log.Info("Failed to load creds for user being deleted; might be left intact... this is fine?")
 		return ctrl.Result{}, nil
 	} else if creds == nil {
@@ -255,11 +255,13 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Cli
 
 		if user.Status.Username != creds.Username {
 			user.Status.Username = creds.Username
-			err = r.Update(ctx, user)
+			err = r.Status().Update(ctx, user)
 			if err != nil {
 				log.Error(err, "Failed to update user status.")
 				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update user status: %w", err)
 			}
+		} else {
+			log.Info("No need to update status.")
 		}
 
 		if roles_assigned {
@@ -304,10 +306,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Cli
 func (r *UserReconciler) getAdminPassword(ctx context.Context, user *v1alpha1.User) (string, error) {
 	log := logf.FromContext(ctx)
 	solrCloudRef := user.Spec.SolrCloudRef
-	namespace := solrCloudRef.Ref.Namespace
-	if namespace == "" {
-		namespace = user.Namespace
-	}
+	namespace := getNamespace(user, solrCloudRef.Ref)
 	var adminSecret corev1.Secret
 	err := r.Get(
 		ctx,

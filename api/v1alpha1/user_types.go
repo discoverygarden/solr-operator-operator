@@ -51,19 +51,12 @@ type SecretRef struct {
 	PasswordKey string `json:"password-key,omitempty"`
 }
 
-// Info about the hashed password and related salt, as used by Solr.
-type HashInfo struct {
-	Hash string `json:"hash,omitempty"`
-	Salt string `json:"salt,omitempty"`
-}
-
 // UserStatus defines the observed state of User.
 type UserStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	HashInfo HashInfo `json:"hash-info,omitempty"`
-	Username string   `json:"username"`
+	Username string `json:"username"`
 }
 
 // +kubebuilder:object:root=true

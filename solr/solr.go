@@ -2,6 +2,7 @@ package solr
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -10,12 +11,14 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	authenication_endpoint string = "api/cluster/security/authentication"
-	authorization_endpoint string = "solr/admin/authorization"
-	default_content_type   string = "application/json"
+	authentication_endpoint string = "api/cluster/security/authentication"
+	authorization_endpoint  string = "solr/admin/authorization"
+	default_content_type    string = "application/json"
 )
 
 type responseHeader struct {
@@ -105,6 +108,7 @@ func (ci *CredInfo) checkPassword(candidate string) (bool, error) {
 }
 
 type Client struct {
+	Context  context.Context
 	User     string
 	Password string
 	Endpoint string
@@ -119,7 +123,7 @@ func (c *Client) baseUrl() (*url.URL, error) {
 	return URL, nil
 }
 
-func (c *Client) newRequest(method string, path string, body []byte, content_type string) (*http.Request, error) {
+func (c *Client) newRequest(method string, path string, body []byte) (*http.Request, error) {
 	reqURL, err := c.baseUrl()
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire base URL: %w", err)
@@ -131,7 +135,7 @@ func (c *Client) newRequest(method string, path string, body []byte, content_typ
 		return nil, fmt.Errorf("failed to build low-level request: %w", err)
 	}
 	req.SetBasicAuth(c.User, c.Password)
-	req.Header.Add("Content-Type", content_type)
+	req.Header.Add("Content-Type", default_content_type)
 
 	return req, nil
 }
@@ -143,12 +147,11 @@ type DeleteUsersMessage struct {
 	Users []string `json:"delete-user"`
 }
 
-func (c *Client) DoAuthenticationPost(message []byte) error {
+func (c *Client) doPostRequest(endpoint string, message []byte) error {
 	req, err := c.newRequest(
 		"POST",
-		authenication_endpoint,
+		endpoint,
 		message,
-		default_content_type,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to build post request: %w", err)
@@ -162,23 +165,12 @@ func (c *Client) DoAuthenticationPost(message []byte) error {
 	return nil
 }
 
-func (c *Client) DoAuthorizationPost(message []byte) error {
-	req, err := c.newRequest(
-		"POST",
-		authorization_endpoint,
-		message,
-		default_content_type,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to build post request: %w", err)
-	}
+func (c *Client) doAuthenticationPost(message []byte) error {
+	return c.doPostRequest(authentication_endpoint, message)
+}
 
-	httpClient := &http.Client{}
-	_, err = httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	return nil
+func (c *Client) doAuthorizationPost(message []byte) error {
+	return c.doPostRequest(authorization_endpoint, message)
 }
 
 func (c *Client) CreateUser(name string, password string) error {
@@ -190,7 +182,7 @@ func (c *Client) CreateUser(name string, password string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate json body for user creation message: %w", err)
 	}
-	return c.DoAuthenticationPost(message)
+	return c.doAuthenticationPost(message)
 }
 
 func (c *Client) UpdateUser(name string, password string) error {
@@ -198,7 +190,7 @@ func (c *Client) UpdateUser(name string, password string) error {
 	return c.CreateUser(name, password)
 }
 
-func (c *Client) getCredentials(username string) (*CredInfo, bool, error) {
+func (c *Client) getCredentialsFromSolr(username string) (*CredInfo, bool, error) {
 	creds, err := c.getAllCredentials()
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to scrape solr creds for %s: %w", username, err)
@@ -208,12 +200,12 @@ func (c *Client) getCredentials(username string) (*CredInfo, bool, error) {
 }
 
 func (c *Client) CheckUserExistence(username string) (bool, error) {
-	_, ok, err := c.getCredentials(username)
+	_, ok, err := c.getCredentialsFromSolr(username)
 	return ok, err
 }
 
 func (c *Client) CheckUser(username string, password string) (bool, error) {
-	combinedCred, ok, err := c.getCredentials(username)
+	combinedCred, ok, err := c.getCredentialsFromSolr(username)
 	if err != nil {
 		return false, fmt.Errorf("failed to get credentials to check user: %w", err)
 	} else if !ok {
@@ -223,34 +215,45 @@ func (c *Client) CheckUser(username string, password string) (bool, error) {
 	}
 }
 
-func (c *Client) getAllRoles() (map[string][]string, error) {
+func (c *Client) deferredClose(to_close io.Closer) {
+	log.FromContext(c.Context)
+	err := to_close.Close()
+	if err != nil {
+		log.Log.Error(err, "Error closing.")
+	}
+}
+
+func (c *Client) doGetRequest(endpoint string) ([]byte, error) {
 	req, err := c.newRequest(
 		"GET",
-		authorization_endpoint,
+		endpoint,
 		nil,
-		default_content_type,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build request for roles: %w", err)
+		return nil, fmt.Errorf("failed to build get request: %w", err)
 	}
 
 	httpClient := &http.Client{}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform request for roles: %w", err)
+		return nil, fmt.Errorf("failed to perform get request: %w", err)
 	}
 
-	defer res.Body.Close()
+	defer c.deferredClose(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read (not-ok) response body: %w", err)
 		}
-		return nil, fmt.Errorf("failed to get users: %s", bodyBytes)
+		return nil, fmt.Errorf("get request returned not-ok: %s", bodyBytes)
 	}
 
-	response_body, err := io.ReadAll(res.Body)
+	return io.ReadAll(res.Body)
+}
+
+func (c *Client) getAllRoles() (map[string][]string, error) {
+	response_body, err := c.doGetRequest(authorization_endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -264,33 +267,7 @@ func (c *Client) getAllRoles() (map[string][]string, error) {
 }
 
 func (c *Client) getAllCredentials() (map[string]CredInfo, error) {
-	req, err := c.newRequest(
-		"GET",
-		authenication_endpoint,
-		nil,
-		default_content_type,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build request for credentials: %w", err)
-	}
-
-	httpClient := &http.Client{}
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform request for credentials: %w", err)
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read (not-ok) response body: %w", err)
-		}
-		return nil, fmt.Errorf("failed to get users: %s", bodyBytes)
-	}
-
-	response_body, err := io.ReadAll(res.Body)
+	response_body, err := c.doGetRequest(authentication_endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -310,7 +287,7 @@ func (c *Client) DeleteUser(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate json body for user deletion message: %w", err)
 	}
-	return c.DoAuthenticationPost(message)
+	return c.doAuthenticationPost(message)
 }
 
 type set map[string]struct{}
@@ -328,7 +305,7 @@ func (set set) addAll(values []string) {
 func (set set) keySet() []string {
 	_keyset := []string{}
 
-	for key, _ := range set {
+	for key := range set {
 		_keyset = append(_keyset, key)
 	}
 
@@ -342,7 +319,6 @@ func setify(values []string) map[string]struct{} {
 }
 
 var default_roles = []string{"admin", "k8s"}
-var default_roles_map = setify(default_roles)
 
 func (c *Client) GetRoles(name string) ([]string, error) {
 	all_assignments, err := c.getAllRoles()
@@ -393,7 +369,7 @@ func (c *Client) UpsertRoles(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate json body for user role update message: %w", err)
 	}
-	return c.DoAuthorizationPost(message)
+	return c.doAuthorizationPost(message)
 }
 
 func (c *Client) DeleteRoles(name string) error {
@@ -405,5 +381,5 @@ func (c *Client) DeleteRoles(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate json body for user role delete message: %w", err)
 	}
-	return c.DoAuthorizationPost(message)
+	return c.doAuthorizationPost(message)
 }
