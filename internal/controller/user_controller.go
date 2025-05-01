@@ -208,6 +208,9 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Cli
 	} else if !ensure_exists_state && creds == nil {
 		log.Info("Failed to load creds for user being deleted; might be left intact... this is fine?")
 		return ctrl.Result{}, nil
+	} else if creds == nil {
+		log.Info("Failed to load creds; skipping.")
+		return ctrl.Result{}, nil
 	}
 
 	user_exists, err := solrClient.CheckUserExistence(creds.Username)
