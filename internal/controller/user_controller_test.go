@@ -19,12 +19,14 @@ package controller
 import (
 	"context"
 
+	"github.com/apache/solr-operator/api/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
@@ -46,12 +48,58 @@ var _ = Describe("User Controller", func() {
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind User")
 			err := k8sClient.Get(ctx, typeNamespacedName, user)
+
 			if err != nil && errors.IsNotFound(err) {
+				bootstrap_secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "solr-solrcloud-security-bootstrap",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"admin": []byte("testasdfqwer"),
+					},
+				}
+				Expect(k8sClient.Create(ctx, bootstrap_secret)).To(Succeed())
+				solr_cloud := &v1beta1.SolrCloud{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "solr",
+						Namespace: "default",
+					},
+					Spec: v1beta1.SolrCloudSpec{},
+				}
+				Expect(k8sClient.Create(ctx, solr_cloud)).To(Succeed())
+				user_secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-name",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"username": []byte("test-username-fun"),
+						"password": []byte("some kind of password"),
+					},
+				}
+				Expect(k8sClient.Create(ctx, user_secret)).To(Succeed())
+
 				resource := &solrv1alpha1.User{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
+					Spec: solrv1alpha1.UserSpec{
+						SolrCloudRef: solrv1alpha1.SolrCloudRef{
+							Ref: solrv1alpha1.ObjectRef{
+								Name:      solr_cloud.Name,
+								Namespace: solr_cloud.Namespace,
+							},
+						},
+						Secret: solrv1alpha1.SecretRef{
+							Ref: solrv1alpha1.ObjectRef{
+								Name:      user_secret.Name,
+								Namespace: user_secret.Namespace,
+							},
+						},
+					},
+					Status: solrv1alpha1.UserStatus{},
 					// TODO(user): Specify other spec details if needed.
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
