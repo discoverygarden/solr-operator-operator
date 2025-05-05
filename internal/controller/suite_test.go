@@ -77,11 +77,15 @@ var _ = BeforeSuite(func() {
 			go_path = filepath.Join(home, "go")
 		}
 	}
+	matches, err := filepath.Glob(filepath.Join(go_path, "pkg", "mod", "github.com", "apache", "solr-operator@*", "config", "crd", "bases"))
+	if err != nil {
+		matches = make([]string, 0)
+	}
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "config", "crd", "bases"),
-			filepath.Join(go_path, "pkg", "mod", "github.com", "apache", "solr-operator@v0.9.1", "config", "crd", "bases"),
-		},
+		CRDDirectoryPaths: append(
+			[]string{filepath.Join("..", "..", "config", "crd", "bases")},
+			matches...,
+		),
 		ErrorIfCRDPathMissing: true,
 	}
 
