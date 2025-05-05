@@ -79,7 +79,8 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 	solrClient, err := r.SolrClientFactory(ctx, &user)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to use factory")
+		log.Error(err, "Failed to invoke factory method to acquire Solr client implementation.")
+		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to invoke factory: %w", err)
 	}
 
 	if user.ObjectMeta.DeletionTimestamp.IsZero() {
