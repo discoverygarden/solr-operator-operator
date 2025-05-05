@@ -33,7 +33,7 @@ import (
 
 	"github.com/apache/solr-operator/api/v1beta1"
 	"github.com/discoverygarden/solr-user-operator/api/v1alpha1"
-	"github.com/discoverygarden/solr-user-operator/solr"
+	"github.com/discoverygarden/solr-user-operator/internal/controller/solr"
 	// +kubebuilder:scaffold:imports
 )
 
