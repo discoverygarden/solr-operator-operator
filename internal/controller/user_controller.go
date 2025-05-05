@@ -40,7 +40,8 @@ import (
 // UserReconciler reconciles a User object
 type UserReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme            *runtime.Scheme
+	SolrClientFactory func(ctx context.Context, user *v1alpha1.User) (solr.ClientInterface, error)
 }
 
 const (
@@ -72,9 +73,13 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	solrClient, err := r.getClient(ctx, &user)
+	if r.SolrClientFactory == nil {
+		// Assign default service/factory, if not provided.
+		r.SolrClientFactory = r.getClient
+	}
+	solrClient, err := r.SolrClientFactory(ctx, &user)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to get client instance for user %s/%s for cloud %s/%s: %w", user.Namespace, user.Name, user.Spec.SolrCloudRef.Ref.Namespace, user.Spec.SolrCloudRef.Ref.Name, err)
+		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to use factory")
 	}
 
 	if user.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -117,7 +122,7 @@ func getNamespace(u *v1alpha1.User, ref v1alpha1.ObjectRef) string {
 	}
 }
 
-func (r *UserReconciler) getClient(ctx context.Context, user *v1alpha1.User) (*solr.Client, error) {
+func (r *UserReconciler) getClient(ctx context.Context, user *v1alpha1.User) (solr.ClientInterface, error) {
 	adminPassword, err := r.getAdminPassword(ctx, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire admin password")
@@ -201,7 +206,7 @@ func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1a
 	return &creds
 }
 
-func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Client, user *v1alpha1.User, ensure_exists_state bool) (ctrl.Result, error) {
+func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.ClientInterface, user *v1alpha1.User, ensure_exists_state bool) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
 	creds := r.getCredentialsFromSecret(ctx, user)
@@ -230,7 +235,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Cli
 			// User doesn't exist; create.
 			if err = solrClient.CreateUser(creds.Username, creds.Password); err != nil {
 				log.Error(err, "Failed to create user.")
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create user %s on %s: %w", creds.Username, solrClient.Endpoint, err)
+				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to create user: %w", err)
 			} else {
 				log.Info("Created user.")
 			}
@@ -239,12 +244,12 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Cli
 			ok, err := solrClient.CheckUser(creds.Username, creds.Password)
 			if err != nil {
 				log.Error(err, "Failed to compare password.")
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to compare password for %s on %s: %w", creds.Username, solrClient.Endpoint, err)
+				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to compare password: %w", err)
 			}
 			if !ok {
 				if err = solrClient.UpdateUser(creds.Username, creds.Password); err != nil {
 					log.Error(err, "Failed to update password.")
-					return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update password for %s on %s: %w", creds.Username, solrClient.Endpoint, err)
+					return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update password: %w", err)
 				} else {
 					log.Info("Updated password.")
 				}
@@ -294,7 +299,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient *solr.Cli
 		} else {
 			if err = solrClient.DeleteUser(creds.Username); err != nil {
 				log.Error(err, "Failed to delete user.")
-				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to delete user %s of %s: %w", creds.Username, solrClient.Endpoint, err)
+				return ctrl.Result{Requeue: true}, fmt.Errorf("failed to delete user: %w", err)
 			} else {
 				log.Info("Deleted user.")
 			}

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/apache/solr-operator/api/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
@@ -30,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
+	"github.com/discoverygarden/solr-user-operator/solr"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -44,41 +46,46 @@ var _ = Describe("User Controller", func() {
 			Namespace: "default", // TODO(user):Modify as needed
 		}
 		user := &solrv1alpha1.User{}
+		user_secret := &corev1.Secret{}
+		solr_cloud := &v1beta1.SolrCloud{}
 
+		BeforeEach(func() {
+			By("creating resources to reference")
+			bootstrap_secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "solr-solrcloud-security-bootstrap",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"admin": []byte("testasdfqwer"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bootstrap_secret)).To(Succeed())
+			solr_cloud = &v1beta1.SolrCloud{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "solr",
+					Namespace: "default",
+				},
+				Spec: v1beta1.SolrCloudSpec{},
+			}
+			Expect(k8sClient.Create(ctx, solr_cloud)).To(Succeed())
+			user_secret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "user-name",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"username": []byte("test-username-fun"),
+					"password": []byte("some kind of password"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, user_secret)).To(Succeed())
+		})
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind User")
 			err := k8sClient.Get(ctx, typeNamespacedName, user)
 
 			if err != nil && errors.IsNotFound(err) {
-				bootstrap_secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "solr-solrcloud-security-bootstrap",
-						Namespace: "default",
-					},
-					Data: map[string][]byte{
-						"admin": []byte("testasdfqwer"),
-					},
-				}
-				Expect(k8sClient.Create(ctx, bootstrap_secret)).To(Succeed())
-				solr_cloud := &v1beta1.SolrCloud{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "solr",
-						Namespace: "default",
-					},
-					Spec: v1beta1.SolrCloudSpec{},
-				}
-				Expect(k8sClient.Create(ctx, solr_cloud)).To(Succeed())
-				user_secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "user-name",
-						Namespace: "default",
-					},
-					Data: map[string][]byte{
-						"username": []byte("test-username-fun"),
-						"password": []byte("some kind of password"),
-					},
-				}
-				Expect(k8sClient.Create(ctx, user_secret)).To(Succeed())
 
 				resource := &solrv1alpha1.User{
 					ObjectMeta: metav1.ObjectMeta{
@@ -120,6 +127,9 @@ var _ = Describe("User Controller", func() {
 			controllerReconciler := &UserReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				SolrClientFactory: func(ctx context.Context, user *solrv1alpha1.User) (solr.ClientInterface, error) {
+					return MockClient{}, nil
+				},
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -131,3 +141,35 @@ var _ = Describe("User Controller", func() {
 		})
 	})
 })
+
+type MockClient struct {
+	solr.ClientInterface
+}
+
+func (c MockClient) CreateUser(name string, pass string) error {
+	return nil
+}
+func (c MockClient) UpdateUser(name string, pass string) error {
+	return fmt.Errorf("unexpected")
+}
+func (c MockClient) CheckUserExistence(username string) (bool, error) {
+	return false, nil
+}
+func (c MockClient) CheckUser(username string, pass string) (bool, error) {
+	return false, nil
+}
+func (c MockClient) DeleteUser(name string) error {
+	return nil
+}
+func (c MockClient) GetRoles(name string) ([]string, error) {
+	return solr.DefaultRoles, nil
+}
+func (c MockClient) HasRoles(name string) (bool, error) {
+	return false, nil
+}
+func (c MockClient) UpsertRoles(name string) error {
+	return nil
+}
+func (c MockClient) DeleteRoles(name string) error {
+	return nil
+}

@@ -107,7 +107,20 @@ func (ci *CredInfo) checkPassword(candidate string) (bool, error) {
 	return bytes.Equal(ci.Hash, hash[:]), nil
 }
 
+type ClientInterface interface {
+	CreateUser(name string, password string) error
+	UpdateUser(name string, password string) error
+	CheckUserExistence(username string) (bool, error)
+	CheckUser(username string, password string) (bool, error)
+	DeleteUser(name string) error
+	GetRoles(name string) ([]string, error)
+	HasRoles(name string) (bool, error)
+	UpsertRoles(name string) error
+	DeleteRoles(name string) error
+}
+
 type Client struct {
+	ClientInterface
 	Context  context.Context
 	User     string
 	Password string
@@ -318,7 +331,7 @@ func setify(values []string) map[string]struct{} {
 	return _map
 }
 
-var default_roles = []string{"admin", "k8s"}
+var DefaultRoles = []string{"admin", "k8s"}
 
 func (c *Client) GetRoles(name string) ([]string, error) {
 	all_assignments, err := c.getAllRoles()
@@ -339,7 +352,7 @@ func (c *Client) HasRoles(name string) (bool, error) {
 		return false, fmt.Errorf("failed to check roles: %w", err)
 	}
 	setish := setify(roles)
-	for _, value := range default_roles {
+	for _, value := range DefaultRoles {
 		_, ok := setish[value]
 		if !ok {
 			return false, nil
@@ -359,7 +372,7 @@ func (c *Client) UpsertRoles(name string) error {
 	}
 	setish := set{}
 	setish.addAll(roles)
-	setish.addAll(default_roles)
+	setish.addAll(DefaultRoles)
 
 	message, err := json.Marshal(SetUserRoleMessage{
 		RoleMap: map[string][]string{
