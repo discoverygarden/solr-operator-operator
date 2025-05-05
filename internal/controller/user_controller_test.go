@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,12 +47,13 @@ var _ = Describe("User Controller", func() {
 			Namespace: "default", // TODO(user):Modify as needed
 		}
 		user := &solrv1alpha1.User{}
+		bootstrap_secret := &corev1.Secret{}
 		user_secret := &corev1.Secret{}
 		solr_cloud := &v1beta1.SolrCloud{}
 
 		BeforeEach(func() {
 			By("creating resources to reference")
-			bootstrap_secret := &corev1.Secret{
+			bootstrap_secret = &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "solr-solrcloud-security-bootstrap",
 					Namespace: "default",
@@ -121,6 +123,21 @@ var _ = Describe("User Controller", func() {
 
 			By("Cleanup the specific resource instance User")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+		AfterEach(func() {
+			names := []client.Object{
+				user_secret,
+				solr_cloud,
+				bootstrap_secret,
+			}
+
+			for _, obj := range names {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+				Expect(err).NotTo(HaveOccurred())
+
+				By(fmt.Sprintf("Cleanup dependent resource: %s/%s", obj.GetNamespace(), obj.GetName()))
+				Expect(k8sClient.Delete(ctx, obj)).To(Succeed())
+			}
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
