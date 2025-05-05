@@ -96,6 +96,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		if controllerutil.ContainsFinalizer(&user, FinaliserName) {
 			// Delete the user.
 			if res, err := r.reconcileUser(ctx, solrClient, &user, false); err != nil {
+				log.Error(err, "Failed reconciling (non-)existence of user.")
 				return res, fmt.Errorf("failed reconciling non-existence of %s/%s: %w", user.Namespace, user.Name, err)
 			}
 
@@ -109,6 +110,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	if res, err := r.reconcileUser(ctx, solrClient, &user, true); err != nil {
+		log.Error(err, "Failed reconciling existence of user.")
 		return res, fmt.Errorf("failed reconciling existence of %s/%s: %w", user.Namespace, user.Name, err)
 	} else {
 		return res, nil
