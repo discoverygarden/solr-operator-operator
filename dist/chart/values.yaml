@@ -3,7 +3,7 @@ controllerManager:
   replicas: 1
   container:
     image:
-      repository: controller
+      repository: 231224489621.dkr.ecr.us-east-1.amazonaws.com/solr-user-operator
       tag: latest
     args:
       - "--leader-elect"

@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: solr-user-operator
-  newTag: asdf
+  newTag: latest

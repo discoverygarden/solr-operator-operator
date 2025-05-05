@@ -26,6 +26,14 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - solr.apache.org
+  resources:
+  - solrclouds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - solr.dgicloud.com
   resources:
   - users

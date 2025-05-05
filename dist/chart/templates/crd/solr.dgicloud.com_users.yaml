@@ -45,39 +45,57 @@ spec:
           spec:
             description: UserSpec defines the desired state of User.
             properties:
-              secretRef:
+              secret:
                 description: Reference to a secret containing the username and password
                   for the user.
                 properties:
-                  name:
+                  password-key:
+                    description: Key in secret containing the password. Defaults to
+                      "password" for compatibility with kubernetes.io/basic-auth secrets.
                     type: string
-                  namespace:
+                  ref:
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  username-key:
+                    description: Key in secret containing the username. Defaults to
+                      "username" for compatibility with kubernetes.io/basic-auth secrets.
                     type: string
                 required:
-                - name
+                - ref
                 type: object
-              solrCloudRef:
+              solrCloud:
                 description: Reference to the Solr Cloud instance in which to manage
                   a user.
                 properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
+                  ref:
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - name
+                    type: object
                 required:
-                - name
+                - ref
                 type: object
             required:
-            - secretRef
-            - solrCloudRef
+            - secret
+            - solrCloud
             type: object
           status:
             description: UserStatus defines the observed state of User.
             properties:
-              hash:
+              username:
                 type: string
-              salt:
-                type: string
+            required:
+            - username
             type: object
         type: object
     served: true
