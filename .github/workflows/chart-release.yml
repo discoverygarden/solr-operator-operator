@@ -1,5 +1,7 @@
 # Helm Chart releasing workflow.
-# Adapted from https://github.com/helm/chart-releaser-action?tab=readme-ov-file#example-workflow
+# Adapted from:
+# - https://github.com/helm/chart-releaser-action?tab=readme-ov-file#example-workflow
+# - https://github.com/discoverygarden/helm-charts/blob/main/.github/workflows/chart-releaser.yml
 name: Release Charts
 
 on:
@@ -33,3 +35,4 @@ jobs:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
           charts_dir: dist
+          packages_with_index: true
