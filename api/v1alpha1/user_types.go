@@ -17,7 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -37,6 +40,17 @@ type ObjectRef struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+func (r *ObjectRef) String() string {
+	return fmt.Sprintf("%s/%s", r.Namespace, r.Name)
+}
+
+func (r *ObjectRef) ToObjectKey() client.ObjectKey {
+	return client.ObjectKey{
+		Namespace: r.Namespace,
+		Name:      r.Name,
+	}
+}
+
 // Reference to the Solr Cloud instance in which to manage a user.
 type SolrCloudRef struct {
 	Ref ObjectRef `json:"ref"`
@@ -46,9 +60,11 @@ type SolrCloudRef struct {
 type SecretRef struct {
 	Ref ObjectRef `json:"ref"`
 	// Key in secret containing the username. Defaults to "username" for compatibility with kubernetes.io/basic-auth secrets.
-	UsernameKey string `json:"username-key,omitempty"`
+	UsernameKey string `json:"username-key,omitempty" default_value:"username"`
 	// Key in secret containing the password. Defaults to "password" for compatibility with kubernetes.io/basic-auth secrets.
-	PasswordKey string `json:"password-key,omitempty"`
+	PasswordKey string `json:"password-key,omitempty" default_value:"password"`
+	// Key in secret indicating the Solr endpoint. Defaults to "endpoint".
+	EndpointKey string `json:"endpoint-key,omitempty" default_value:"endpoint"`
 }
 
 // UserStatus defines the observed state of User.
@@ -56,7 +72,8 @@ type UserStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Username string `json:"username"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	Username   string             `json:"username"`
 }
 
 // +kubebuilder:object:root=true

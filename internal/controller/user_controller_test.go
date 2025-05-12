@@ -19,11 +19,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/apache/solr-operator/api/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -48,7 +50,12 @@ var _ = Describe("User Controller", func() {
 		}
 		user := &solrv1alpha1.User{}
 		bootstrap_secret := &corev1.Secret{}
-		user_secret := &corev1.Secret{}
+		user_secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "user-name",
+				Namespace: "default",
+			},
+		}
 		solr_cloud := &v1beta1.SolrCloud{}
 
 		BeforeEach(func() {
@@ -71,17 +78,17 @@ var _ = Describe("User Controller", func() {
 				Spec: v1beta1.SolrCloudSpec{},
 			}
 			Expect(k8sClient.Create(ctx, solr_cloud)).To(Succeed())
-			user_secret = &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "user-name",
-					Namespace: "default",
-				},
-				Data: map[string][]byte{
-					"username": []byte("test-username-fun"),
-					"password": []byte("some kind of password"),
-				},
-			}
-			Expect(k8sClient.Create(ctx, user_secret)).To(Succeed())
+			// user_secret = &corev1.Secret{
+			// 	ObjectMeta: metav1.ObjectMeta{
+			// 		Name:      "user-name",
+			// 		Namespace: "default",
+			// 	},
+			// 	Data: map[string][]byte{
+			// 		"username": []byte("test-username-fun"),
+			// 		"password": []byte("some kind of password"),
+			// 	},
+			// }
+			// Expect(k8sClient.Create(ctx, user_secret)).To(Succeed())
 		})
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind User")
@@ -121,10 +128,17 @@ var _ = Describe("User Controller", func() {
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
+			Expect(meta.IsStatusConditionTrue(resource.Status.Conditions, conditionSecretAvailable)).Should(BeTrue())
+			Expect(meta.IsStatusConditionTrue(resource.Status.Conditions, conditionUserAvailable)).Should(BeTrue())
+
 			By("Cleanup the specific resource instance User")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		AfterEach(func() {
+			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(user_secret), user_secret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(maps.Keys(user_secret.Data)).Should(ContainElements("username", "password", "endpoint"))
+
 			names := []client.Object{
 				user_secret,
 				solr_cloud,
@@ -144,8 +158,10 @@ var _ = Describe("User Controller", func() {
 			controllerReconciler := &UserReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				SolrClientFactory: func(ctx context.Context, user *solrv1alpha1.User) (solr.ClientInterface, error) {
-					return MockClient{}, nil
+				solrClientFactory: func(ctx context.Context, user *solrv1alpha1.User) (solr.ClientInterface, error) {
+					return MockClient{
+						solrCloud: solr_cloud,
+					}, nil
 				},
 			}
 
@@ -161,6 +177,7 @@ var _ = Describe("User Controller", func() {
 
 type MockClient struct {
 	solr.ClientInterface
+	solrCloud *v1beta1.SolrCloud
 }
 
 func (c MockClient) CreateUser(name string, pass string) error {
@@ -189,4 +206,7 @@ func (c MockClient) UpsertRoles(name string) error {
 }
 func (c MockClient) DeleteRoles(name string) error {
 	return nil
+}
+func (c MockClient) GetSolrCloud() *v1beta1.SolrCloud {
+	return c.solrCloud
 }

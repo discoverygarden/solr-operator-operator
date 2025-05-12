@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/apache/solr-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -28,14 +29,20 @@ type ClientInterface interface {
 	HasRoles(name string) (bool, error)
 	UpsertRoles(name string) error
 	DeleteRoles(name string) error
+	GetSolrCloud() *v1beta1.SolrCloud
 }
 
 type Client struct {
 	ClientInterface
-	Context  context.Context
-	User     string
-	Password string
-	Endpoint string
+	Context   context.Context
+	User      string
+	Password  string
+	Endpoint  string
+	SolrCloud *v1beta1.SolrCloud
+}
+
+func (c *Client) GetSolrCloud() *v1beta1.SolrCloud {
+	return c.SolrCloud
 }
 
 func (c *Client) baseUrl() (*url.URL, error) {
