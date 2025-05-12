@@ -47,41 +47,31 @@ spec:
                     description: Key in secret indicating the Solr endpoint. Defaults
                       to "endpoint".
                     type: string
+                  name:
+                    type: string
+                  namespace:
+                    type: string
                   password-key:
                     description: Key in secret containing the password. Defaults to
                       "password" for compatibility with kubernetes.io/basic-auth secrets.
                     type: string
-                  ref:
-                    properties:
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                    required:
-                    - name
-                    type: object
                   username-key:
                     description: Key in secret containing the username. Defaults to
                       "username" for compatibility with kubernetes.io/basic-auth secrets.
                     type: string
                 required:
-                - ref
+                - name
                 type: object
               solrCloud:
                 description: Reference to the Solr Cloud instance in which to manage
                   a user.
                 properties:
-                  ref:
-                    properties:
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                    required:
-                    - name
-                    type: object
+                  name:
+                    type: string
+                  namespace:
+                    type: string
                 required:
-                - ref
+                - name
                 type: object
             required:
             - secret

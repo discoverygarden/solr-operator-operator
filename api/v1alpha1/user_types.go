@@ -53,12 +53,12 @@ func (r *ObjectRef) ToObjectKey() client.ObjectKey {
 
 // Reference to the Solr Cloud instance in which to manage a user.
 type SolrCloudRef struct {
-	Ref ObjectRef `json:"ref"`
+	ObjectRef `json:",inline"`
 }
 
 // Reference to a secret containing the username and password for the user.
 type SecretRef struct {
-	Ref ObjectRef `json:"ref"`
+	ObjectRef `json:",inline"`
 	// Key in secret containing the username. Defaults to "username" for compatibility with kubernetes.io/basic-auth secrets.
 	UsernameKey string `json:"username-key,omitempty" default_value:"username"`
 	// Key in secret containing the password. Defaults to "password" for compatibility with kubernetes.io/basic-auth secrets.

@@ -103,13 +103,13 @@ var _ = Describe("User Controller", func() {
 					},
 					Spec: solrv1alpha1.UserSpec{
 						SolrCloudRef: solrv1alpha1.SolrCloudRef{
-							Ref: solrv1alpha1.ObjectRef{
+							ObjectRef: solrv1alpha1.ObjectRef{
 								Name:      solr_cloud.Name,
 								Namespace: solr_cloud.Namespace,
 							},
 						},
 						Secret: solrv1alpha1.SecretRef{
-							Ref: solrv1alpha1.ObjectRef{
+							ObjectRef: solrv1alpha1.ObjectRef{
 								Name:      user_secret.Name,
 								Namespace: user_secret.Namespace,
 							},

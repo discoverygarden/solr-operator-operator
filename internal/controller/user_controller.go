@@ -201,8 +201,8 @@ func (r *UserReconciler) getClient(ctx context.Context, user *v1alpha1.User) (so
 
 func (r *UserReconciler) getSecret(ctx context.Context, user *v1alpha1.User, try_create bool) (*corev1.Secret, error) {
 	log := logf.FromContext(ctx)
-	ref := user.Spec.Secret.Ref.ToObjectKey()
-	ref.Namespace = getNamespace(user, user.Spec.Secret.Ref)
+	ref := user.Spec.Secret.ToObjectKey()
+	ref.Namespace = getNamespace(user, user.Spec.Secret.ObjectRef)
 
 	var secret corev1.Secret
 	if err := r.Get(ctx, ref, &secret); err != nil {
@@ -652,7 +652,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 }
 
 func (r *UserReconciler) getSolrCloud(ctx context.Context, user *v1alpha1.User) (*v1beta1.SolrCloud, error) {
-	solrCloudRef := user.Spec.SolrCloudRef.Ref
+	solrCloudRef := user.Spec.SolrCloudRef.ObjectRef
 	ref := solrCloudRef.ToObjectKey()
 	ref.Namespace = getNamespace(user, solrCloudRef)
 
@@ -708,7 +708,7 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 
 				for _, element := range list.Items {
-					ref := element.Spec.Secret.Ref
+					ref := element.Spec.Secret.ObjectRef
 					if ref.Namespace == secret.GetNamespace() && ref.Name == secret.GetName() {
 						requests = append(requests, reconcile.Request{
 							NamespacedName: client.ObjectKeyFromObject(&element),
@@ -734,7 +734,7 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 
 				for _, element := range list.Items {
-					ref := element.Spec.SolrCloudRef.Ref
+					ref := element.Spec.SolrCloudRef.ObjectRef
 					if ref.Namespace == solr_cloud.GetNamespace() && ref.Name == solr_cloud.GetName() {
 						requests = append(requests, reconcile.Request{
 							NamespacedName: client.ObjectKeyFromObject(&element),
