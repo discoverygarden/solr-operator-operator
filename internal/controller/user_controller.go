@@ -220,6 +220,7 @@ func (r *UserReconciler) getSecret(ctx context.Context, user *v1alpha1.User, try
 					Namespace: ref.Namespace,
 				},
 			}
+			controllerutil.SetOwnerReference(user, &secret, r.Scheme)
 
 			if err := r.Create(ctx, &secret); err != nil {
 				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
