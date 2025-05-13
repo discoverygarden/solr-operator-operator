@@ -129,10 +129,7 @@ func (r *CollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if err := r.observeCollection(ctx, &collection); err != nil {
-		log.Error(err, "Failed to observe collection.")
-		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to observe collection: %w", err)
-	}
+	r.observeCollection(ctx, &collection)
 	if meta.IsStatusConditionTrue(collection.Status.Conditions, conditionCollectionConfigMapAvailable) {
 		all_clear := true
 		for _, condition := range base_conditions {
@@ -192,7 +189,7 @@ func (r *CollectionReconciler) getConfigMap(ctx context.Context, collection *v1a
 	}
 }
 
-func (r *CollectionReconciler) observeCollection(ctx context.Context, collection *v1alpha1.Collection) error {
+func (r *CollectionReconciler) observeCollection(ctx context.Context, collection *v1alpha1.Collection) {
 	log := logf.FromContext(ctx)
 
 	if config_map, err := r.getConfigMap(ctx, collection); err != nil {
@@ -250,8 +247,6 @@ func (r *CollectionReconciler) observeCollection(ctx context.Context, collection
 	}
 
 	r.checkMapStatus(collection)
-
-	return nil
 }
 
 func (r *CollectionReconciler) checkMapStatus(collection *v1alpha1.Collection) {

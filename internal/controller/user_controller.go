@@ -269,7 +269,7 @@ func (c *Credentials) getSecretKey(cred_field_name string, user *v1alpha1.User) 
 	return &secret_key, nil
 }
 
-func (c *Credentials) extractFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) error {
+func (c *Credentials) extractFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) {
 	log := logf.FromContext(ctx)
 	cred_type := reflect.TypeOf(*c)
 	for index, value := range reflect.VisibleFields(cred_type) {
@@ -312,8 +312,6 @@ func (c *Credentials) extractFromSecret(ctx context.Context, user *v1alpha1.User
 			"key", secret_key,
 		)
 	}
-
-	return nil
 }
 
 func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) *Credentials {
@@ -322,9 +320,7 @@ func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1a
 
 	if secret != nil {
 		// Get info from secret.
-		if err := creds.extractFromSecret(ctx, user, secret); err != nil {
-			log.Error(err, "Failed to extract values from secret.")
-		}
+		creds.extractFromSecret(ctx, user, secret)
 	}
 	if creds.Username == "" {
 		if user.Status.Username != "" {
