@@ -220,7 +220,9 @@ func (r *UserReconciler) getSecret(ctx context.Context, user *v1alpha1.User, try
 					Namespace: ref.Namespace,
 				},
 			}
-			controllerutil.SetOwnerReference(user, &secret, r.Scheme)
+			if err := controllerutil.SetOwnerReference(user, &secret, r.Scheme); err != nil {
+				log.Error(err, "Failed to set owner of created secret.")
+			}
 
 			if err := r.Create(ctx, &secret); err != nil {
 				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
@@ -383,6 +385,120 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		return nil
 	}
 
+	secret_dirty, err := r.reconcileSecret(ctx, user, creds, secret, solrClient)
+	if err != nil {
+		log.Error(err, "Failed to reconcile secret.")
+		return fmt.Errorf("failed to reconcile secret: %w", err)
+	}
+
+	if err := r.reconcileObserveUser(ctx, user, creds, solrClient); err != nil {
+		log.Error(err, "Failed to observe user.")
+		return fmt.Errorf("failed to observe user: %w", err)
+	}
+
+	if ensure_exists_state {
+		// Ensure the user exists (with the given password and groups).
+		if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionUserExists) {
+			// User doesn't exist; create.
+			if err := solrClient.CreateUser(creds.Username, creds.Password); err != nil {
+				log.Error(err, "Failed to create user.")
+				return fmt.Errorf("failed to create user: %w", err)
+			}
+
+			log.Info("Created user.")
+			for _, value := range []string{conditionUserExists, conditionUserPasswordUpToDate} {
+				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+					Type:    value,
+					Status:  v1.ConditionTrue,
+					Reason:  "CreateUser",
+					Message: "Created user.",
+				})
+			}
+		} else {
+			// User exists; update password if appropriate.
+			if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionUserPasswordUpToDate) {
+				if err := solrClient.UpdateUser(creds.Username, creds.Password); err != nil {
+					log.Error(err, "Failed to update password.")
+					meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+						Type:    conditionUserPasswordUpToDate,
+						Status:  v1.ConditionUnknown,
+						Reason:  "FailedPasswordCheck",
+						Message: fmt.Sprintf("Failed to check if password is up-to-date: %s", err),
+					})
+					return fmt.Errorf("failed to update password: %w", err)
+				}
+				log.Info("Updated password.")
+				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+					Type:    conditionUserPasswordUpToDate,
+					Status:  v1.ConditionTrue,
+					Reason:  "UpdatedPassword",
+					Message: "Update Solr with password.",
+				})
+			}
+		}
+
+		if user.Status.Username != creds.Username {
+			user.Status.Username = creds.Username
+			log.Info("Updating username in status.")
+		} else {
+			log.Info("No need to update username in status.")
+		}
+
+		if meta.IsStatusConditionTrue(user.Status.Conditions, conditionUserHasRoles) {
+			// Status should have been update above.
+			log.Info("User has roles; no need to assign.")
+		} else {
+			if err := solrClient.UpsertRoles(creds.Username); err != nil {
+				log.Error(err, "Failed to upsert roles.")
+				return fmt.Errorf("failed to upsert roles: %w", err)
+			}
+			log.Info("Added roles.")
+			meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+				Type:    conditionUserHasRoles,
+				Status:  v1.ConditionTrue,
+				Reason:  "AddededRoles",
+				Message: "Added roles.",
+			})
+		}
+		if secret_dirty && meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretAvailable) {
+			if err := r.Update(ctx, secret); err != nil {
+				log.Error(err, "Failed to update secret.")
+			} else {
+				log.Info("Updated secret.")
+				// secret_dirty = false
+			}
+		}
+	} else {
+		// Expecting subresources/status to go away along with the resource
+		// proper, so let's not bother updating the resource status.
+		if meta.IsStatusConditionTrue(user.Status.Conditions, conditionUserHasRoles) {
+			if err := solrClient.DeleteRoles(creds.Username); err != nil {
+				log.Error(err, "Failed to delete roles for user.")
+				return fmt.Errorf("failed to delete roles for user: %w", err)
+			}
+			log.Info("Deleted roles for user.")
+		} else {
+			log.Info("User does not have roles; no need to remove.")
+		}
+
+		// Delete the user (if it exists).
+		if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionUserExists) {
+			log.Info("User does not appear to exist in Solr.")
+		} else {
+			if err := solrClient.DeleteUser(creds.Username); err != nil {
+				log.Error(err, "Failed to delete user.")
+				return fmt.Errorf("failed to delete user: %w", err)
+			} else {
+				log.Info("Deleted user.")
+			}
+		}
+	}
+	return nil
+}
+
+func (r *UserReconciler) reconcileSecret(ctx context.Context, user *v1alpha1.User, creds *Credentials, secret *corev1.Secret, solrClient solr.ClientInterface) (bool, error) {
+	log := logf.FromContext(ctx)
+
 	secret_conditions := make([]v1.Condition, 0)
 	secret_dirty := false
 
@@ -390,16 +506,24 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		secret.Data = make(map[string][]byte)
 	}
 
-	if !meta.IsStatusConditionPresentAndEqual(user.Status.Conditions, conditionSecretUsername, v1.ConditionTrue) {
+	if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretUsername) {
 		// TODO: Mint unique username: {user.namespace}-{user.name}-{random suffix} or something of the like?
-		suffix := make([]byte, 8)
-		rand.Read(suffix)
-		username := fmt.Sprintf("%s--%s--%s", user.Namespace, user.Name, base64.StdEncoding.EncodeToString(suffix))
+		suffix := make([]byte, 6)
+		if _, err := rand.Read(suffix); err != nil {
+			log.Error(err, "Failed to generate random suffix for username.")
+			return false, fmt.Errorf("failed to generate random suffix for username: %w", err)
+		}
+		username := fmt.Sprintf(
+			"%s--%s--%s",
+			user.Namespace,
+			user.Name,
+			base64.StdEncoding.EncodeToString(suffix),
+		)
 		// TODO: Save username on secret (to configured key).
 		key, err := creds.getSecretKey("Username", user)
 		if err != nil {
-			log.Error(err, "failed to get secret key for username")
-			return nil
+			log.Error(err, "Failed to get secret key for username.")
+			return false, fmt.Errorf("failed to get secret key for username: %w", err)
 		}
 		creds.Username = username
 		secret.Data[*key] = []byte(username)
@@ -412,16 +536,19 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		})
 	}
 
-	if !meta.IsStatusConditionPresentAndEqual(user.Status.Conditions, conditionSecretPassword, v1.ConditionTrue) {
+	if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretPassword) {
 		// TODO: Generate password.
-		password_bytes := make([]byte, 32)
-		rand.Read(password_bytes)
+		password_bytes := make([]byte, 24)
+		if _, err := rand.Read(password_bytes); err != nil {
+			log.Error(err, "Failed to generate bytes for password.")
+			return false, fmt.Errorf("failed to generate bytes for password: %w", err)
+		}
 		password := base64.StdEncoding.EncodeToString(password_bytes)
 		// TODO: Save password on secret (to configured key).
 		key, err := creds.getSecretKey("Password", user)
 		if err != nil {
-			log.Error(err, "failed to get secret key for password")
-			return nil
+			log.Error(err, "Failed to get secret key for password.")
+			return false, fmt.Errorf("failed to get secret key for password: %w", err)
 		}
 		creds.Password = password
 		secret.Data[*key] = []byte(password)
@@ -439,8 +566,8 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		endpoint := solrClient.GetSolrCloud().InternalCommonUrl(true)
 		key, err := creds.getSecretKey("Endpoint", user)
 		if err != nil {
-			log.Error(err, "failed to get secret key for endpoint")
-			return nil
+			log.Error(err, "Failed to get secret key for endpoint.")
+			return false, fmt.Errorf("failed to get secret key for endpoint: %w", err)
 		}
 		creds.Endpoint = endpoint
 		if !slices.Equal(secret.Data[*key], []byte(endpoint)) {
@@ -463,9 +590,6 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 	}
 
 	if len(secret_conditions) > 0 {
-		if err := r.Update(ctx, secret); err != nil {
-			return fmt.Errorf("failed updating secret: %w", err)
-		}
 		for _, condition := range secret_conditions {
 			meta.SetStatusCondition(&user.Status.Conditions, condition)
 		}
@@ -473,7 +597,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		conditions := []string{conditionSecretExists, conditionSecretUsername, conditionSecretPassword, conditionSecretEndpoint}
 		statuses := make([]bool, len(conditions))
 		for i, value := range conditions {
-			statuses[i] = meta.IsStatusConditionPresentAndEqual(user.Status.Conditions, value, v1.ConditionTrue)
+			statuses[i] = meta.IsStatusConditionTrue(user.Status.Conditions, value)
 		}
 		if !slices.Contains(statuses, false) {
 			meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
@@ -491,6 +615,11 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 			})
 		}
 	}
+	return secret_dirty, nil
+}
+
+func (r *UserReconciler) reconcileObserveUser(ctx context.Context, user *v1alpha1.User, creds *Credentials, solrClient solr.ClientInterface) error {
+	log := logf.FromContext(ctx)
 
 	user_exists, err := solrClient.CheckUserExistence(creds.Username)
 	if err != nil {
@@ -503,12 +632,46 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 			Reason:  "UserInConfig",
 			Message: "User appears to exist in Solr config.",
 		})
+
+		ok, err := solrClient.CheckUser(creds.Username, creds.Password)
+		if err != nil {
+			meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+				Type:    conditionUserPasswordUpToDate,
+				Status:  v1.ConditionUnknown,
+				Reason:  "Error",
+				Message: fmt.Sprintf("Failed to check if password is up-to-date. Error: %s", err),
+			})
+			log.Error(err, "Failed to compare password.")
+			return fmt.Errorf("failed to compare password: %w", err)
+		}
+		if !ok {
+			meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+				Type:    conditionUserPasswordUpToDate,
+				Status:  v1.ConditionFalse,
+				Reason:  "PasswordDifferent",
+				Message: "Password in Solr config appears to have diverged.",
+			})
+		} else {
+			log.Info("Password appears up-to-date; no need to update.")
+			meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+				Type:    conditionUserPasswordUpToDate,
+				Status:  v1.ConditionTrue,
+				Reason:  "PasswordUpToDate",
+				Message: "Solr appears up-to-date with password from spec'd secret.",
+			})
+		}
 	} else {
 		meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
 			Type:    conditionUserExists,
 			Status:  v1.ConditionFalse,
 			Reason:  "UserNotInConfig",
-			Message: "User appears does not appear to exist in Solr config.",
+			Message: "User does not appear to exist in Solr config.",
+		})
+		meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
+			Type:    conditionUserPasswordUpToDate,
+			Status:  v1.ConditionFalse,
+			Reason:  "UserNotInConfig",
+			Message: "User does not appear to be in config, so cannot have an up-to-date password.",
 		})
 	}
 
@@ -532,122 +695,6 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		})
 	}
 
-	if ensure_exists_state {
-		// Ensure the user exists (with the given password and groups).
-		if !user_exists {
-			// User doesn't exist; create.
-			if err := solrClient.CreateUser(creds.Username, creds.Password); err != nil {
-				log.Error(err, "Failed to create user.")
-				return fmt.Errorf("failed to create user: %w", err)
-			}
-
-			log.Info("Created user.")
-			for _, value := range []string{conditionUserExists, conditionUserPasswordUpToDate} {
-				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
-					Type:    value,
-					Status:  v1.ConditionTrue,
-					Reason:  "CreateUser",
-					Message: "Created user.",
-				})
-			}
-		} else {
-			// User exists; update password if appropriate.
-			ok, err := solrClient.CheckUser(creds.Username, creds.Password)
-			if err != nil {
-				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
-					Type:    conditionUserPasswordUpToDate,
-					Status:  v1.ConditionUnknown,
-					Reason:  "Error",
-					Message: fmt.Sprintf("Failed to check if password is up-to-date. Error: %s", err),
-				})
-				log.Error(err, "Failed to compare password.")
-				return fmt.Errorf("failed to compare password: %w", err)
-			}
-			if !ok {
-				if err := solrClient.UpdateUser(creds.Username, creds.Password); err != nil {
-					log.Error(err, "Failed to update password.")
-					meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
-						Type:    conditionUserPasswordUpToDate,
-						Status:  v1.ConditionUnknown,
-						Reason:  "FailedPasswordCheck",
-						Message: fmt.Sprintf("Failed to check if password is up-to-date: %s", err),
-					})
-					return fmt.Errorf("failed to update password: %w", err)
-				}
-				log.Info("Updated password.")
-				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
-					Type:    conditionUserPasswordUpToDate,
-					Status:  v1.ConditionTrue,
-					Reason:  "UpdatedPassword",
-					Message: "Update Solr with password from spec'd secret.",
-				})
-			} else {
-				log.Info("Password appears up-to-date; no need to update.")
-				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
-					Type:    conditionUserPasswordUpToDate,
-					Status:  v1.ConditionTrue,
-					Reason:  "PasswordUpToDate",
-					Message: "Solr appears up-to-date with password from spec'd secret.",
-				})
-			}
-		}
-
-		if user.Status.Username != creds.Username {
-			user.Status.Username = creds.Username
-			log.Info("Updating username in status.")
-		} else {
-			log.Info("No need to update username in status.")
-		}
-
-		if roles_assigned {
-			// Status should have been update above.
-			log.Info("User has roles; no need to assign.")
-		} else {
-			if err := solrClient.UpsertRoles(creds.Username); err != nil {
-				log.Error(err, "Failed to upsert roles.")
-				return fmt.Errorf("failed to upsert roles: %w", err)
-			}
-			log.Info("Added roles.")
-			meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
-				Type:    conditionUserHasRoles,
-				Status:  v1.ConditionTrue,
-				Reason:  "AddededRoles",
-				Message: "Added roles.",
-			})
-		}
-		if secret_dirty && meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretAvailable) {
-			if err := r.Update(ctx, secret); err != nil {
-				log.Error(err, "Failed to update secret.")
-			} else {
-				log.Info("Updated secret.")
-				secret_dirty = false
-			}
-		}
-	} else {
-		// Expecting subresources/status to go away along with the resource
-		// proper, so let's not bother updating the resource status.
-		if roles_assigned {
-			if err := solrClient.DeleteRoles(creds.Username); err != nil {
-				log.Error(err, "Failed to delete roles for user.")
-				return fmt.Errorf("failed to delete roles for user: %w", err)
-			}
-			log.Info("Deleted roles for user.")
-		} else {
-			log.Info("User does not have roles; no need to remove.")
-		}
-
-		// Delete the user (if it exists).
-		if !user_exists {
-			log.Info("User does not appear to exist in Solr.")
-		} else {
-			if err := solrClient.DeleteUser(creds.Username); err != nil {
-				log.Error(err, "Failed to delete user.")
-				return fmt.Errorf("failed to delete user: %w", err)
-			} else {
-				log.Info("Deleted user.")
-			}
-		}
-	}
 	return nil
 }
 

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/apache/solr-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -220,26 +222,19 @@ func (set set) add(value string) {
 	set[value] = struct{}{}
 }
 
-func (set set) addAll(values []string) {
+func (set set) addAll(values []string) set {
 	for _, value := range values {
 		set.add(value)
 	}
+	return set
 }
 
 func (set set) keySet() []string {
-	_keyset := []string{}
-
-	for key := range set {
-		_keyset = append(_keyset, key)
-	}
-
-	return _keyset
+	return slices.Collect(maps.Keys(set))
 }
 
 func setify(values []string) map[string]struct{} {
-	_map := make(set)
-	_map.addAll(values)
-	return _map
+	return make(set).addAll(values)
 }
 
 var DefaultRoles = []string{"admin", "k8s"}
