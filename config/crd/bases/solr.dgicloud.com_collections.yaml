@@ -39,9 +39,6 @@ spec:
           spec:
             description: CollectionSpec defines the desired state of Collection.
             properties:
-              create-rw-role:
-                description: Create R/W role.
-                type: boolean
               map:
                 description: Config map in which to stash values.
                 properties:
@@ -52,8 +49,24 @@ spec:
                 required:
                 - name
                 type: object
+              removalPolicy:
+                description: Removal policy. One of "delete" or "retain", to respectively
+                  delete or retain the underlying collection.
+                type: string
+              solrCloudRef:
+                description: The target Solr Cloud instance
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                type: object
             required:
             - map
+            - removalPolicy
+            - solrCloudRef
             type: object
           status:
             description: CollectionStatus defines the observed state of Collection.
@@ -117,9 +130,6 @@ spec:
                 type: array
               name:
                 description: Collection name to use.
-                type: string
-              role:
-                description: Role name, if requested.
                 type: string
             type: object
         type: object

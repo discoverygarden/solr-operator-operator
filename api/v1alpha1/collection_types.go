@@ -25,10 +25,6 @@ import (
 
 // CollectionSpec defines the desired state of Collection.
 type CollectionSpec struct {
-	// Create R/W role.
-	// +optional
-	CreateRWRole bool `json:"create-rw-role,omitempty" default_value:"false"`
-
 	// The target Solr Cloud instance
 	TargetSolr SolrCloudRef `json:"solrCloudRef"`
 
@@ -46,10 +42,6 @@ type CollectionStatus struct {
 
 	// Collection name to use.
 	Name string `json:"name,omitempty"`
-
-	// Role name, if requested.
-	// +optional
-	RWRole string `json:"role,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -47,9 +47,7 @@ const (
 	conditionCollectionConfigMapAvailable     string = "ConfigMapAvailable"
 	conditionCollectionConfigMapExists        string = "ConfigMapExists"
 	conditionCollectionConfigMapHasCollection string = "ConfigMapHasCollection"
-	conditionCollectionConfigMapHasRole       string = "ConfigMapHasRole"
 	configMapCollectionKey                    string = "collectionName"
-	configMapRoleKey                          string = "rwRole"
 )
 
 // +kubebuilder:rbac:groups=solr.dgicloud.com,resources=collections,verbs=get;list;watch;create;update;patch;delete
@@ -84,10 +82,6 @@ func (r *CollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		conditionCollectionConfigMapAvailable,
 		conditionCollectionConfigMapExists,
 		conditionCollectionConfigMapHasCollection,
-	}
-
-	if collection.Spec.CreateRWRole {
-		base_conditions = append(base_conditions, conditionCollectionConfigMapHasRole)
 	}
 
 	if collection.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -182,7 +176,6 @@ func (r *CollectionReconciler) observeCollection(ctx context.Context, collection
 		conditions := []string{
 			conditionCollectionConfigMapExists,
 			conditionCollectionConfigMapHasCollection,
-			conditionCollectionConfigMapHasRole,
 		}
 		if client.IgnoreNotFound(err) == nil {
 			for _, condition := range conditions {
@@ -231,23 +224,6 @@ func (r *CollectionReconciler) observeCollection(ctx context.Context, collection
 				Message: "Collection name missing from config map.",
 			})
 		}
-
-		if value, ok := config_map.Data[configMapRoleKey]; ok {
-			meta.SetStatusCondition(&collection.Status.Conditions, v1.Condition{
-				Type:    conditionCollectionConfigMapHasRole,
-				Status:  v1.ConditionTrue,
-				Reason:  "ConfigMapHasRole",
-				Message: "Found role name in the config map.",
-			})
-			collection.Status.RWRole = value
-		} else {
-			meta.SetStatusCondition(&collection.Status.Conditions, v1.Condition{
-				Type:    conditionCollectionConfigMapHasRole,
-				Status:  v1.ConditionFalse,
-				Reason:  "ConfigMapMissingRole",
-				Message: "Role name missing from config map.",
-			})
-		}
 	}
 
 	r.checkMapStatus(collection)
@@ -259,9 +235,6 @@ func (r *CollectionReconciler) checkMapStatus(collection *v1alpha1.Collection) {
 	available_conditions := []string{
 		conditionCollectionConfigMapExists,
 		conditionCollectionConfigMapHasCollection,
-	}
-	if collection.Spec.CreateRWRole {
-		available_conditions = append(available_conditions, conditionCollectionConfigMapHasRole)
 	}
 	condition_status := make([]bool, len(available_conditions))
 	for index, value := range available_conditions {
@@ -342,17 +315,6 @@ func (r *CollectionReconciler) updateCollection(ctx context.Context, collection 
 			Status:  v1.ConditionTrue,
 			Reason:  "GeneratedCollectionName",
 			Message: "Generated collection name.",
-		})
-	}
-
-	if collection.Spec.CreateRWRole && !meta.IsStatusConditionTrue(collection.Status.Conditions, conditionCollectionConfigMapHasRole) {
-		// TODO: Generate R/W role name
-		config_map_dirty = true
-		meta.SetStatusCondition(&collection.Status.Conditions, v1.Condition{
-			Type:    conditionCollectionConfigMapHasRole,
-			Status:  v1.ConditionTrue,
-			Reason:  "GeneratedRole",
-			Message: "Generate role.",
 		})
 	}
 
