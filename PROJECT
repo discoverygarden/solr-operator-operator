@@ -19,4 +19,13 @@ resources:
   kind: User
   path: github.com/discoverygarden/solr-user-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: dgicloud.com
+  group: solr
+  kind: Collection
+  path: github.com/discoverygarden/solr-user-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

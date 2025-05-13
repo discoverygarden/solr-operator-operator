@@ -32,6 +32,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
 	"github.com/discoverygarden/solr-user-operator/internal/controller/solr"
@@ -158,10 +159,12 @@ var _ = Describe("User Controller", func() {
 			controllerReconciler := &UserReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				solrClientFactory: func(ctx context.Context, user *solrv1alpha1.User) (solr.ClientInterface, error) {
-					return MockClient{
-						solrCloud: solr_cloud,
-					}, nil
+				SolrClientAware: SolrClientAware{
+					solrClientFactory: func(ctx context.Context, base v1.ObjectMeta, ref *solrv1alpha1.SolrCloudRef) (solr.ClientInterface, error) {
+						return MockClient{
+							solrCloud: solr_cloud,
+						}, nil
+					},
 				},
 			}
 

@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,8 +45,8 @@ import (
 // UserReconciler reconciles a User object
 type UserReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	solrClientFactory func(ctx context.Context, user *v1alpha1.User) (solr.ClientInterface, error)
+	SolrClientAware
+	Scheme *runtime.Scheme
 }
 
 const (
@@ -92,7 +91,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		// Assign default service/factory, if not provided.
 		r.solrClientFactory = r.getClient
 	}
-	solrClient, err := r.solrClientFactory(ctx, &user)
+	solrClient, err := r.solrClientFactory(ctx, user.ObjectMeta, &user.Spec.SolrCloudRef)
 	if err != nil {
 		log.Error(err, "Failed to invoke factory method to acquire Solr client implementation.")
 		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to invoke factory: %w", err)
@@ -171,7 +170,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 }
 
-func getNamespace(u *v1alpha1.User, ref v1alpha1.ObjectRef) string {
+func getNamespace(u v1.ObjectMeta, ref v1alpha1.ObjectRef) string {
 	if ref.Namespace != "" {
 		return ref.Namespace
 	} else {
@@ -179,30 +178,10 @@ func getNamespace(u *v1alpha1.User, ref v1alpha1.ObjectRef) string {
 	}
 }
 
-func (r *UserReconciler) getClient(ctx context.Context, user *v1alpha1.User) (solr.ClientInterface, error) {
-	solr_cloud, err := r.getSolrCloud(ctx, user)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire Solr Cloud instance: %w", err)
-	}
-
-	adminPassword, err := r.getAdminPassword(ctx, solr_cloud)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire admin password")
-	}
-
-	return &solr.Client{
-		Context:   ctx,
-		User:      "admin",
-		Password:  adminPassword,
-		Endpoint:  solr_cloud.InternalCommonUrl(true),
-		SolrCloud: solr_cloud,
-	}, nil
-}
-
 func (r *UserReconciler) getSecret(ctx context.Context, user *v1alpha1.User, try_create bool) (*corev1.Secret, error) {
 	log := logf.FromContext(ctx)
 	ref := user.Spec.Secret.ToObjectKey()
-	ref.Namespace = getNamespace(user, user.Spec.Secret.ObjectRef)
+	ref.Namespace = getNamespace(user.ObjectMeta, user.Spec.Secret.ObjectRef)
 
 	var secret corev1.Secret
 	if err := r.Get(ctx, ref, &secret); err != nil {
@@ -290,7 +269,7 @@ func (c *Credentials) getSecretKey(cred_field_name string, user *v1alpha1.User) 
 	return &secret_key, nil
 }
 
-func (c *Credentials) ExtractFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) error {
+func (c *Credentials) extractFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) error {
 	log := logf.FromContext(ctx)
 	cred_type := reflect.TypeOf(*c)
 	for index, value := range reflect.VisibleFields(cred_type) {
@@ -343,7 +322,7 @@ func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1a
 
 	if secret != nil {
 		// Get info from secret.
-		if err := creds.ExtractFromSecret(ctx, user, secret); err != nil {
+		if err := creds.extractFromSecret(ctx, user, secret); err != nil {
 			log.Error(err, "Failed to extract values from secret.")
 		}
 	}
@@ -696,43 +675,6 @@ func (r *UserReconciler) reconcileObserveUser(ctx context.Context, user *v1alpha
 	}
 
 	return nil
-}
-
-func (r *UserReconciler) getSolrCloud(ctx context.Context, user *v1alpha1.User) (*v1beta1.SolrCloud, error) {
-	solrCloudRef := user.Spec.SolrCloudRef.ObjectRef
-	ref := solrCloudRef.ToObjectKey()
-	ref.Namespace = getNamespace(user, solrCloudRef)
-
-	var solr_cloud *v1beta1.SolrCloud
-	if err := r.Get(ctx, ref, solr_cloud); err != nil {
-		return nil, fmt.Errorf("failed to acquire Solr Cloud reference: %w", err)
-	}
-	return solr_cloud, nil
-}
-
-func (r *UserReconciler) getAdminPassword(ctx context.Context, solr_cloud *v1beta1.SolrCloud) (string, error) {
-	log := logf.FromContext(ctx)
-
-	var adminSecret corev1.Secret
-
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: solr_cloud.Namespace,
-			Name:      solr_cloud.SecurityBootstrapSecretName(),
-		},
-		&adminSecret,
-	); err != nil {
-		log.Error(err, "Unable to fetch admin secret.")
-		return "", err
-	}
-	adminPasswordBytes, ok := adminSecret.Data["admin"]
-	if !ok {
-		log.Info("Failed to get admin password from secret.")
-		return "", fmt.Errorf("failed to get admin password from secret")
-	}
-	adminPassword := string(adminPasswordBytes)
-	return adminPassword, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
