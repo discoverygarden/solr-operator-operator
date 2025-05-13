@@ -156,6 +156,29 @@ func (r *CollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.Info("Created collection.")
 	}
 
+	if meta.IsStatusConditionTrue(collection.Status.Conditions, conditionCollectionConfigMapAvailable) {
+		meta.SetStatusCondition(&collection.Status.Conditions, v1.Condition{
+			Type:    conditionCollectionAvailable,
+			Status:  v1.ConditionTrue,
+			Reason:  "Ready",
+			Message: "Ready!",
+		})
+	} else {
+		meta.SetStatusCondition(&collection.Status.Conditions, v1.Condition{
+			Type:    conditionCollectionAvailable,
+			Status:  v1.ConditionFalse,
+			Reason:  "NotReady",
+			Message: "Not ready...",
+		})
+	}
+
+	if err := r.Status().Update(ctx, &collection); err != nil {
+		log.Error(err, "Failed to update status.")
+		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to update status: %w", err)
+	} else {
+		log.Info("Updated status.")
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -258,7 +281,8 @@ func (r *CollectionReconciler) checkMapStatus(collection *v1alpha1.Collection) {
 }
 
 func (r *CollectionReconciler) createCollection(ctx context.Context, collection *v1alpha1.Collection) error {
-	return nil
+	// XXX: Not meaningfully different, here?
+	return r.updateCollection(ctx, collection)
 }
 
 func (r *CollectionReconciler) updateCollection(ctx context.Context, collection *v1alpha1.Collection) error {
@@ -284,7 +308,7 @@ func (r *CollectionReconciler) updateCollection(ctx context.Context, collection 
 			log.Error(err, "Failed to set owner reference; proceeding anyway.")
 		}
 	} else if cmap, err := r.getConfigMap(ctx, collection); err != nil {
-		return fmt.Errorf("failed to get config map to update: %w", err)
+		return fmt.Errorf("failed to get config map: %w", err)
 	} else {
 		config_map = *cmap
 	}
@@ -336,10 +360,13 @@ func (r *CollectionReconciler) updateCollection(ctx context.Context, collection 
 }
 
 func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection *v1alpha1.Collection) error {
+	// log := logf.FromContext(ctx)
+
 	// Handle collection deletion.
 	if collection.Spec.RemovalPolicy == "delete" {
 		// TODO: Actually delete the collection from Solr.
 	}
+
 	return nil
 }
 

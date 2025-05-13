@@ -19,7 +19,7 @@ package controller
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"slices"
@@ -486,19 +486,19 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *v1alpha1.Use
 	}
 
 	if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretUsername) {
-		// TODO: Mint unique username: {user.namespace}-{user.name}-{random suffix} or something of the like?
-		suffix := make([]byte, 6)
+		// Mint unique username: {user.namespace}-{user.name}-{random suffix} or something of the like?
+		suffix := make([]byte, 4)
 		if _, err := rand.Read(suffix); err != nil {
 			log.Error(err, "Failed to generate random suffix for username.")
 			return false, fmt.Errorf("failed to generate random suffix for username: %w", err)
 		}
 		username := fmt.Sprintf(
-			"%s--%s--%s",
+			"%s--%s--%x",
 			user.Namespace,
 			user.Name,
-			base64.StdEncoding.EncodeToString(suffix),
+			suffix,
 		)
-		// TODO: Save username on secret (to configured key).
+		// Save username on secret (to configured key).
 		key, err := creds.getSecretKey("Username", user)
 		if err != nil {
 			log.Error(err, "Failed to get secret key for username.")
@@ -516,14 +516,14 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *v1alpha1.Use
 	}
 
 	if !meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretPassword) {
-		// TODO: Generate password.
-		password_bytes := make([]byte, 24)
+		// Generate password.
+		password_bytes := make([]byte, 16)
 		if _, err := rand.Read(password_bytes); err != nil {
 			log.Error(err, "Failed to generate bytes for password.")
 			return false, fmt.Errorf("failed to generate bytes for password: %w", err)
 		}
-		password := base64.StdEncoding.EncodeToString(password_bytes)
-		// TODO: Save password on secret (to configured key).
+		password := hex.EncodeToString(password_bytes)
+		// Save password on secret (to configured key).
 		key, err := creds.getSecretKey("Password", user)
 		if err != nil {
 			log.Error(err, "Failed to get secret key for password.")

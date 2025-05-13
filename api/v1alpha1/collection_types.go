@@ -28,7 +28,7 @@ type CollectionSpec struct {
 	// The target Solr Cloud instance
 	TargetSolr SolrCloudRef `json:"solrCloudRef"`
 
-	// Config map in which to stash values.
+	// Config map in which to stash values. Will be created if it does not exist.
 	Map ObjectRef `json:"map"`
 
 	// Removal policy. One of "delete" or "retain", to respectively delete or retain the underlying collection.

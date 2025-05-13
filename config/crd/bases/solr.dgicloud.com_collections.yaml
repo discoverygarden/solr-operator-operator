@@ -40,7 +40,8 @@ spec:
             description: CollectionSpec defines the desired state of Collection.
             properties:
               map:
-                description: Config map in which to stash values.
+                description: Config map in which to stash values. Will be created
+                  if it does not exist.
                 properties:
                   name:
                     type: string

@@ -18,13 +18,17 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/apache/solr-operator/api/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
@@ -41,7 +45,30 @@ var _ = Describe("Collection Controller", func() {
 			Namespace: "default", // TODO(user):Modify as needed
 		}
 		collection := &solrv1alpha1.Collection{}
+		bootstrap_secret := &corev1.Secret{}
+		solr_cloud := &v1beta1.SolrCloud{}
 
+		BeforeEach(func() {
+			By("creating resources to reference")
+			bootstrap_secret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "solr-solrcloud-security-bootstrap",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"admin": []byte("testasdfqwer"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bootstrap_secret)).To(Succeed())
+			solr_cloud = &v1beta1.SolrCloud{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "solr",
+					Namespace: "default",
+				},
+				Spec: v1beta1.SolrCloudSpec{},
+			}
+			Expect(k8sClient.Create(ctx, solr_cloud)).To(Succeed())
+		})
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind Collection")
 			err := k8sClient.Get(ctx, typeNamespacedName, collection)
@@ -51,7 +78,19 @@ var _ = Describe("Collection Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: solrv1alpha1.CollectionSpec{
+						TargetSolr: solrv1alpha1.SolrCloudRef{
+							ObjectRef: solrv1alpha1.ObjectRef{
+								Name:      solr_cloud.Name,
+								Namespace: solr_cloud.Namespace,
+							},
+						},
+						Map: solrv1alpha1.ObjectRef{
+							Name:      "test-map",
+							Namespace: "default",
+						},
+						RemovalPolicy: "delete",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -65,6 +104,20 @@ var _ = Describe("Collection Controller", func() {
 
 			By("Cleanup the specific resource instance Collection")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+		AfterEach(func() {
+			names := []client.Object{
+				solr_cloud,
+				bootstrap_secret,
+			}
+
+			for _, obj := range names {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+				Expect(err).NotTo(HaveOccurred())
+
+				By(fmt.Sprintf("Cleanup dependent resource: %s/%s", obj.GetNamespace(), obj.GetName()))
+				Expect(k8sClient.Delete(ctx, obj)).To(Succeed())
+			}
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
