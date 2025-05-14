@@ -42,7 +42,7 @@ func (r *SolrClientAware) getDefaultClient(ctx context.Context, base v1.ObjectMe
 
 	adminPassword, err := r.getAdminPassword(ctx, solr_cloud)
 	if err != nil {
-		return nil, fmt.Errorf("failed to acquire admin password")
+		return nil, fmt.Errorf("failed to acquire admin password: %w", err)
 	}
 
 	return &solr.Client{
@@ -78,12 +78,12 @@ func (r *SolrClientAware) getAdminPassword(ctx context.Context, solr_cloud *v1be
 		&adminSecret,
 	); err != nil {
 		log.Error(err, "Unable to fetch admin secret.")
-		return "", err
+		return "", fmt.Errorf("failed to fetch admin secret: %w", err)
 	}
 	adminPasswordBytes, ok := adminSecret.Data["admin"]
 	if !ok {
 		log.Info("Failed to get admin password from secret.")
-		return "", fmt.Errorf("failed to get admin password from secret")
+		return "", fmt.Errorf("failed to get admin password from secret; not under the expected 'admin' key?")
 	}
 	adminPassword := string(adminPasswordBytes)
 	return adminPassword, nil
