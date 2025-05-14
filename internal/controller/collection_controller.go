@@ -72,11 +72,6 @@ func (r *CollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if r.solrClientFactory == nil {
-		// Assign default service/factory, if not provided.
-		r.solrClientFactory = r.getClient
-	}
-
 	base_conditions := []string{
 		conditionCollectionConfigMapAvailable,
 		conditionCollectionConfigMapExists,
@@ -364,7 +359,7 @@ func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection 
 	// Handle collection deletion.
 	if collection.Spec.RemovalPolicy == "delete" {
 		// Actually delete the collection from Solr.
-		if c, err := r.solrClientFactory(ctx, collection.ObjectMeta, &collection.Spec.TargetSolr); err != nil {
+		if c, err := r.getClient(ctx, collection.ObjectMeta, &collection.Spec.TargetSolr); err != nil {
 			return fmt.Errorf("failed to get Solr client: %w", err)
 		} else if err := c.DeleteCollection(collection.Status.Name); err != nil {
 			return fmt.Errorf("failed to delete collection (%s): %w", collection.Status.Name, err)

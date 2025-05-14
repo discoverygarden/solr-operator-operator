@@ -16,7 +16,7 @@ import (
 
 type SolrClientAware struct {
 	client.Client
-	solrClientFactory func(ctx context.Context, base v1.ObjectMeta, user *v1alpha1.SolrCloudRef) (solr.ClientInterface, error)
+	solrClientFactory func(ctx context.Context, base v1.ObjectMeta, ref *v1alpha1.SolrCloudRef) (solr.ClientInterface, error)
 }
 
 func (r *SolrClientAware) getNamespace(u v1.ObjectMeta, ref v1alpha1.ObjectRef) string {
@@ -28,6 +28,13 @@ func (r *SolrClientAware) getNamespace(u v1.ObjectMeta, ref v1alpha1.ObjectRef) 
 }
 
 func (r *SolrClientAware) getClient(ctx context.Context, base v1.ObjectMeta, ref *v1alpha1.SolrCloudRef) (solr.ClientInterface, error) {
+	if r.solrClientFactory != nil {
+		return r.solrClientFactory(ctx, base, ref)
+	}
+	return r.getDefaultClient(ctx, base, ref)
+}
+
+func (r *SolrClientAware) getDefaultClient(ctx context.Context, base v1.ObjectMeta, ref *v1alpha1.SolrCloudRef) (solr.ClientInterface, error) {
 	solr_cloud, err := r.getSolrCloud(ctx, base, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire Solr Cloud instance: %w", err)
@@ -48,15 +55,15 @@ func (r *SolrClientAware) getClient(ctx context.Context, base v1.ObjectMeta, ref
 }
 
 func (r *SolrClientAware) getSolrCloud(ctx context.Context, base v1.ObjectMeta, solrCloud *v1alpha1.SolrCloudRef) (*v1beta1.SolrCloud, error) {
-	solrCloudRef := solrCloud.ObjectRef
-	ref := solrCloudRef.ToObjectKey()
-	ref.Namespace = r.getNamespace(base, solrCloudRef)
+	ref := solrCloud.ToObjectKey()
+	ref.Namespace = r.getNamespace(base, solrCloud.ObjectRef)
 
-	var solr_cloud *v1beta1.SolrCloud
-	if err := r.Get(ctx, ref, solr_cloud); err != nil {
+	var solr_cloud v1beta1.SolrCloud
+	logf.FromContext(ctx).Info(fmt.Sprintf("asdfasdf; r=%v, context=%s, ref=%v, asdf=%v", r == nil, ctx, ref, solr_cloud))
+	if err := r.Get(ctx, ref, &solr_cloud); err != nil {
 		return nil, fmt.Errorf("failed to acquire Solr Cloud reference: %w", err)
 	}
-	return solr_cloud, nil
+	return &solr_cloud, nil
 }
 
 func (r *SolrClientAware) getAdminPassword(ctx context.Context, solr_cloud *v1beta1.SolrCloud) (string, error) {

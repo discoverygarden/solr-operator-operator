@@ -208,6 +208,9 @@ func main() {
 	if err = (&controller.UserReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		SolrClientAware: controller.SolrClientAware{
+			Client: mgr.GetClient(),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "User")
 		os.Exit(1)
@@ -215,6 +218,9 @@ func main() {
 	if err = (&controller.CollectionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		SolrClientAware: controller.SolrClientAware{
+			Client: mgr.GetClient(),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Collection")
 		os.Exit(1)

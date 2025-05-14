@@ -87,11 +87,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if r.solrClientFactory == nil {
-		// Assign default service/factory, if not provided.
-		r.solrClientFactory = r.getClient
-	}
-	solrClient, err := r.solrClientFactory(ctx, user.ObjectMeta, &user.Spec.SolrCloudRef)
+	solrClient, err := r.getClient(ctx, user.ObjectMeta, &user.Spec.SolrCloudRef)
 	if err != nil {
 		log.Error(err, "Failed to invoke factory method to acquire Solr client implementation.")
 		return ctrl.Result{Requeue: true}, fmt.Errorf("failed to invoke factory: %w", err)
