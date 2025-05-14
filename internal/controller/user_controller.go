@@ -294,7 +294,7 @@ func (c *Credentials) extractFromSecret(ctx context.Context, user *solrv1alpha1.
 			)
 			continue
 		}
-		reflect.ValueOf(c).Field(index).SetString(string(secret_value))
+		reflect.ValueOf(c).Elem().Field(index).SetString(string(secret_value))
 		meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
 			Type:    value.Tag.Get("condition"),
 			Status:  v1.ConditionTrue,

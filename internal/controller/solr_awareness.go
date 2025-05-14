@@ -49,7 +49,6 @@ func (r *SolrClientAware) getDefaultClient(ctx context.Context, base v1.ObjectMe
 		Context:   ctx,
 		User:      "admin",
 		Password:  adminPassword,
-		Endpoint:  solr_cloud.InternalCommonUrl(true),
 		SolrCloud: solr_cloud,
 	}, nil
 }
@@ -59,7 +58,6 @@ func (r *SolrClientAware) getSolrCloud(ctx context.Context, base v1.ObjectMeta, 
 	ref.Namespace = r.getNamespace(base, solrCloud.ObjectRef)
 
 	var solr_cloud v1beta1.SolrCloud
-	logf.FromContext(ctx).Info(fmt.Sprintf("asdfasdf; r=%v, context=%s, ref=%v, asdf=%v", r == nil, ctx, ref, solr_cloud))
 	if err := r.Get(ctx, ref, &solr_cloud); err != nil {
 		return nil, fmt.Errorf("failed to acquire Solr Cloud reference: %w", err)
 	}

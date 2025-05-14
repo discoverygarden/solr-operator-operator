@@ -42,7 +42,6 @@ type Client struct {
 	Context   context.Context
 	User      string
 	Password  string
-	Endpoint  string
 	SolrCloud *v1beta1.SolrCloud
 }
 
@@ -51,7 +50,7 @@ func (c *Client) GetSolrCloud() *v1beta1.SolrCloud {
 }
 
 func (c *Client) baseUrl() (*url.URL, error) {
-	URL, err := url.ParseRequestURI(c.Endpoint)
+	URL, err := url.Parse(v1beta1.InternalURLForCloud(c.GetSolrCloud()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
