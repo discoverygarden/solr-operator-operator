@@ -682,7 +682,7 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				log := logf.FromContext(ctx)
-				secret := obj.(*corev1.Secret)
+				secret := obj.(*v1.PartialObjectMetadata)
 
 				var list v1alpha1.UserList
 				requests := []reconcile.Request{}
@@ -708,7 +708,7 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&v1beta1.SolrCloud{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				log := logf.FromContext(ctx)
-				solr_cloud := obj.(*v1beta1.SolrCloud)
+				solr_cloud := obj.(*v1.PartialObjectMetadata)
 
 				var list v1alpha1.UserList
 				requests := []reconcile.Request{}
