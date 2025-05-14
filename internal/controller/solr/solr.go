@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strings"
 
 	"github.com/apache/solr-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -75,11 +74,7 @@ func (c *Client) newRequest(method string, path string, body []byte, values url.
 		return nil, fmt.Errorf("failed to build base request URL: %w", err)
 	}
 	if values != nil {
-		query_chunks := make([]string, len(values))
-		for index, value := range values {
-			query_chunks = append(query_chunks, fmt.Sprintf("%s=%s", url.QueryEscape(index), url.QueryEscape(strings.Join(value, ","))))
-		}
-		reqURL.RawQuery = strings.Join(query_chunks, "&")
+		reqURL.RawQuery = values.Encode()
 	}
 
 	req, err := http.NewRequest(method, reqURL.String(), bytes.NewBuffer(body))
