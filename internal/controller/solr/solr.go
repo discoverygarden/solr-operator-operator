@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/apache/solr-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -18,6 +19,7 @@ import (
 const (
 	authentication_endpoint string = "api/cluster/security/authentication"
 	authorization_endpoint  string = "solr/admin/authorization"
+	collection_endpoint     string = "admin/collections"
 	default_content_type    string = "application/json"
 )
 
@@ -32,6 +34,7 @@ type ClientInterface interface {
 	UpsertRoles(name string) error
 	DeleteRoles(name string) error
 	GetSolrCloud() *v1beta1.SolrCloud
+	DeleteCollection(name string) error
 }
 
 type Client struct {
@@ -56,12 +59,27 @@ func (c *Client) baseUrl() (*url.URL, error) {
 	return URL, nil
 }
 
-func (c *Client) newRequest(method string, path string, body []byte) (*http.Request, error) {
+func (c *Client) newRequestUrl(path string) (*url.URL, error) {
 	reqURL, err := c.baseUrl()
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire base URL: %w", err)
 	}
 	reqURL = reqURL.JoinPath(path)
+	return reqURL, nil
+}
+
+func (c *Client) newRequest(method string, path string, body []byte, values url.Values) (*http.Request, error) {
+	reqURL, err := c.newRequestUrl(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build base request URL: %w", err)
+	}
+	if values != nil {
+		query_chunks := make([]string, len(values))
+		for index, value := range values {
+			query_chunks = append(query_chunks, fmt.Sprintf("%s=%s", url.QueryEscape(index), url.QueryEscape(strings.Join(value, ","))))
+		}
+		reqURL.RawQuery = strings.Join(query_chunks, "&")
+	}
 
 	req, err := http.NewRequest(method, reqURL.String(), bytes.NewBuffer(body))
 	if err != nil {
@@ -78,6 +96,7 @@ func (c *Client) doPostRequest(endpoint string, message []byte) error {
 		"POST",
 		endpoint,
 		message,
+		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to build post request: %w", err)
@@ -149,11 +168,12 @@ func (c *Client) deferredClose(to_close io.Closer) {
 	}
 }
 
-func (c *Client) doGetRequest(endpoint string) ([]byte, error) {
+func (c *Client) doGetRequest(endpoint string, values url.Values) ([]byte, error) {
 	req, err := c.newRequest(
 		"GET",
 		endpoint,
 		nil,
+		values,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build get request: %w", err)
@@ -179,7 +199,7 @@ func (c *Client) doGetRequest(endpoint string) ([]byte, error) {
 }
 
 func (c *Client) getAllRoles() (map[string][]string, error) {
-	response_body, err := c.doGetRequest(authorization_endpoint)
+	response_body, err := c.doGetRequest(authorization_endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -193,7 +213,7 @@ func (c *Client) getAllRoles() (map[string][]string, error) {
 }
 
 func (c *Client) getAllCredentials() (map[string]credInfo, error) {
-	response_body, err := c.doGetRequest(authentication_endpoint)
+	response_body, err := c.doGetRequest(authentication_endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -297,4 +317,18 @@ func (c *Client) DeleteRoles(name string) error {
 		return fmt.Errorf("failed to generate json body for user role delete message: %w", err)
 	}
 	return c.doAuthorizationPost(message)
+}
+
+func (c *Client) DeleteCollection(name string) error {
+	result_body, err := c.doGetRequest(
+		collection_endpoint,
+		url.Values{
+			"action": []string{"CREATE"},
+			"name":   []string{name},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting collection: %w; result body: %s", err, result_body)
+	}
+	return nil
 }

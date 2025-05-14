@@ -355,11 +355,26 @@ func (r *CollectionReconciler) updateCollection(ctx context.Context, collection 
 }
 
 func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection *v1alpha1.Collection) error {
-	// log := logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
+
+	if collection.Status.Name == "" {
+		log.Info("Collection name not in status; not deleting from Solr. Proceeding anyway.")
+		return nil
+	}
 
 	// Handle collection deletion.
 	if collection.Spec.RemovalPolicy == "delete" {
-		// TODO: Actually delete the collection from Solr.
+		// Actually delete the collection from Solr.
+		if c, err := r.solrClientFactory(ctx, collection.ObjectMeta, &collection.Spec.TargetSolr); err != nil {
+			return fmt.Errorf("failed to get Solr client: %w", err)
+		} else if err := c.DeleteCollection(collection.Status.Name); err != nil {
+			return fmt.Errorf("failed to delete collection (%s): %w", collection.Status.Name, err)
+		}
+		log.Info("Deleted collection: %s", collection.Status.Name)
+	} else if collection.Spec.RemovalPolicy == "retain" {
+		log.Info("Retaining collection: %s", collection.Status.Name)
+	} else {
+		return fmt.Errorf("unrecognized removal policy %s; expecting one of delete or retain", collection.Spec.RemovalPolicy)
 	}
 
 	return nil
