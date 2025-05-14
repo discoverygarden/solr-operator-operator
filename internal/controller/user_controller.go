@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"reflect"
 	"slices"
 
@@ -50,16 +51,17 @@ type UserReconciler struct {
 }
 
 const (
-	FinaliserName                 string = "solr.dgicloud.com/finalizer"
-	conditionSecretAvailable      string = "SecretAvailable"
-	conditionSecretExists         string = "SecretExists"
-	conditionSecretUsername       string = "SecretUsername"
-	conditionSecretPassword       string = "SecretPassword"
-	conditionSecretEndpoint       string = "SecretEndpoint"
-	conditionUserAvailable        string = "Available"
-	conditionUserExists           string = "Exists"
-	conditionUserHasRoles         string = "HasRoles"
-	conditionUserPasswordUpToDate string = "PasswordUpToDate"
+	FinaliserName                   string = "solr.dgicloud.com/finalizer"
+	conditionSecretAvailable        string = "SecretAvailable"
+	conditionSecretExists           string = "SecretExists"
+	conditionSecretUsername         string = "SecretUsername"
+	conditionSecretPassword         string = "SecretPassword"
+	conditionSecretEndpoint         string = "SecretEndpoint"
+	conditionSecretEndpointHostname string = "SecretEndpointHostname"
+	conditionUserAvailable          string = "Available"
+	conditionUserExists             string = "Exists"
+	conditionUserHasRoles           string = "HasRoles"
+	conditionUserPasswordUpToDate   string = "PasswordUpToDate"
 )
 
 // +kubebuilder:rbac:groups=solr.dgicloud.com,resources=users,verbs=get;list;watch;create;update;patch;delete
@@ -214,7 +216,7 @@ func (r *UserReconciler) getSecret(ctx context.Context, user *solrv1alpha1.User,
 				Reason:  "Created",
 				Message: "Created secret.",
 			})
-			for _, value := range []string{conditionSecretUsername, conditionSecretPassword, conditionSecretEndpoint} {
+			for _, value := range []string{conditionSecretUsername, conditionSecretPassword, conditionSecretEndpoint, conditionSecretEndpointHostname} {
 				meta.SetStatusCondition(&user.Status.Conditions, v1.Condition{
 					Type:    value,
 					Status:  v1.ConditionFalse,
@@ -244,6 +246,7 @@ type Credentials struct {
 	Username string `spec_field_name:"UsernameKey" condition:"SecretUsername"`
 	Password string `spec_field_name:"PasswordKey" condition:"SecretPassword"`
 	Endpoint string `spec_field_name:"EndpointKey" condition:"SecretEndpoint"`
+	Hostname string `spec_field_name:"EndpointHostnameKey" condition:"SecretEndpointHostname"`
 }
 
 func (c *Credentials) getSecretKey(cred_field_name string, user *solrv1alpha1.User) (*string, error) {
@@ -558,6 +561,35 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1
 				Message: "Endpoint already set.",
 			})
 		}
+
+		key, err = creds.getSecretKey("Hostname", user)
+		if err != nil {
+			log.Error(err, "Failed to get secret key for endpoint.")
+			return false, fmt.Errorf("failed to get secret key for endpoint: %w", err)
+		}
+		parsed_url, err := url.Parse(endpoint)
+		if err != nil {
+			log.Error(err, "Failed to parse endpoint URL to get hostname.")
+			return false, fmt.Errorf("failed to parse endpoint URL to get hostname: %w", err)
+		}
+		creds.Hostname = parsed_url.Host
+		if !slices.Equal(secret.Data[*key], []byte(parsed_url.Hostname())) {
+			secret.Data[*key] = []byte(endpoint)
+			secret_dirty = true
+			secret_conditions = append(secret_conditions, v1.Condition{
+				Type:    conditionSecretEndpointHostname,
+				Status:  v1.ConditionTrue,
+				Reason:  "SetHostname",
+				Message: "Set hostname.",
+			})
+		} else {
+			secret_conditions = append(secret_conditions, v1.Condition{
+				Type:    conditionSecretEndpointHostname,
+				Status:  v1.ConditionTrue,
+				Reason:  "HostnameAlreadySet",
+				Message: "Hostname already set.",
+			})
+		}
 	}
 
 	if len(secret_conditions) > 0 {
@@ -565,7 +597,7 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1
 			meta.SetStatusCondition(&user.Status.Conditions, condition)
 		}
 
-		conditions := []string{conditionSecretExists, conditionSecretUsername, conditionSecretPassword, conditionSecretEndpoint}
+		conditions := []string{conditionSecretExists, conditionSecretUsername, conditionSecretPassword, conditionSecretEndpoint, conditionSecretEndpointHostname}
 		statuses := make([]bool, len(conditions))
 		for i, value := range conditions {
 			statuses[i] = meta.IsStatusConditionTrue(user.Status.Conditions, value)

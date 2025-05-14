@@ -43,6 +43,10 @@ spec:
                 description: Reference to a secret containing the username and password
                   for the user.
                 properties:
+                  endpoint-hostname-key:
+                    description: Key in secret indicating the hostname of the Solr
+                      endpoint. Defaults to "endpoint-hostname"
+                    type: string
                   endpoint-key:
                     description: Key in secret indicating the Solr endpoint. Defaults
                       to "endpoint".

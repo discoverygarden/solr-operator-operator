@@ -65,6 +65,8 @@ type SecretRef struct {
 	PasswordKey string `json:"password-key,omitempty" default_value:"password"`
 	// Key in secret indicating the Solr endpoint. Defaults to "endpoint".
 	EndpointKey string `json:"endpoint-key,omitempty" default_value:"endpoint"`
+	// Key in secret indicating the hostname of the Solr endpoint. Defaults to "endpoint-hostname"
+	EndpointHostnameKey string `json:"endpoint-hostname-key,omitempty" default_value:"endpoint-hostname"`
 }
 
 // UserStatus defines the observed state of User.
