@@ -54,7 +54,7 @@ spec:
                 description: Removal policy. One of "delete" or "retain", to respectively
                   delete or retain the underlying collection.
                 type: string
-              solrCloudRef:
+              solrCloud:
                 description: The target Solr Cloud instance
                 properties:
                   name:
@@ -67,7 +67,7 @@ spec:
             required:
             - map
             - removalPolicy
-            - solrCloudRef
+            - solrCloud
             type: object
           status:
             description: CollectionStatus defines the observed state of Collection.

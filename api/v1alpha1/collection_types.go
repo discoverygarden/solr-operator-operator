@@ -26,7 +26,7 @@ import (
 // CollectionSpec defines the desired state of Collection.
 type CollectionSpec struct {
 	// The target Solr Cloud instance
-	TargetSolr SolrCloudRef `json:"solrCloudRef"`
+	TargetSolr SolrCloudRef `json:"solrCloud"`
 
 	// Config map in which to stash values. Will be created if it does not exist.
 	Map ObjectRef `json:"map"`

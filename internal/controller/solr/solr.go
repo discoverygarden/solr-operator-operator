@@ -19,7 +19,7 @@ import (
 const (
 	authentication_endpoint string = "api/cluster/security/authentication"
 	authorization_endpoint  string = "solr/admin/authorization"
-	collection_endpoint     string = "admin/collections"
+	collection_endpoint     string = "solr/admin/collections"
 	default_content_type    string = "application/json"
 )
 
@@ -34,6 +34,8 @@ type ClientInterface interface {
 	UpsertRoles(name string) error
 	DeleteRoles(name string) error
 	GetSolrCloud() *v1beta1.SolrCloud
+	ListCollections() ([]string, error)
+	CollectionExists(name string) (bool, error)
 	DeleteCollection(name string) error
 }
 
@@ -204,8 +206,7 @@ func (c *Client) getAllRoles() (map[string][]string, error) {
 	}
 
 	auth := &getAuthResp{}
-	err = json.Unmarshal(response_body, auth)
-	if err != nil {
+	if err := json.Unmarshal(response_body, auth); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json response: %w", err)
 	}
 	return auth.Authorization.UserRoles, nil
@@ -218,8 +219,7 @@ func (c *Client) getAllCredentials() (map[string]credInfo, error) {
 	}
 
 	auth := &getUsersResp{}
-	err = json.Unmarshal(response_body, auth)
-	if err != nil {
+	if err := json.Unmarshal(response_body, auth); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json response: %w", err)
 	}
 	return auth.Authentication.Credentials, nil
@@ -318,11 +318,36 @@ func (c *Client) DeleteRoles(name string) error {
 	return c.doAuthorizationPost(message)
 }
 
+func (c *Client) ListCollections() ([]string, error) {
+	result_body, err := c.doGetRequest(
+		collection_endpoint,
+		url.Values{
+			"action": []string{"LIST"},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error listing collections: %w; result body: %s", err, result_body)
+	}
+	listing := &listCollectionsResp{}
+	if err := json.Unmarshal(result_body, listing); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json response: %w", err)
+	}
+	return listing.Collections, nil
+}
+
+func (c *Client) CollectionExists(name string) (bool, error) {
+	if collections, err := c.ListCollections(); err != nil {
+		return false, fmt.Errorf("error listing collections: %w", err)
+	} else {
+		return slices.Contains(collections, name), nil
+	}
+}
+
 func (c *Client) DeleteCollection(name string) error {
 	result_body, err := c.doGetRequest(
 		collection_endpoint,
 		url.Values{
-			"action": []string{"CREATE"},
+			"action": []string{"DELETE"},
 			"name":   []string{name},
 		},
 	)

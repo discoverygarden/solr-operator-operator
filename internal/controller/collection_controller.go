@@ -52,6 +52,10 @@ const (
 // +kubebuilder:rbac:groups=solr.dgicloud.com,resources=collections,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=solr.dgicloud.com,resources=collections/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=solr.dgicloud.com,resources=collections/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
+// +kubebuilder:rbac:groups="",resources=secrets/status,verbs=get
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -359,12 +363,22 @@ func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection 
 	// Handle collection deletion.
 	if collection.Spec.RemovalPolicy == "delete" {
 		// Actually delete the collection from Solr.
-		if c, err := r.getClient(ctx, collection.ObjectMeta, &collection.Spec.TargetSolr); err != nil {
+		c, err := r.getClient(ctx, collection.ObjectMeta, &collection.Spec.TargetSolr)
+		if err != nil {
 			return fmt.Errorf("failed to get Solr client: %w", err)
-		} else if err := c.DeleteCollection(collection.Status.Name); err != nil {
-			return fmt.Errorf("failed to delete collection (%s): %w", collection.Status.Name, err)
 		}
-		log.Info("Deleted collection: %s", collection.Status.Name)
+		exists, err := c.CollectionExists(collection.Status.Name)
+		if err != nil {
+			return fmt.Errorf("failed to check if collection exists prior to deletion; skipping deletion: %w", err)
+		}
+		if exists {
+			if err := c.DeleteCollection(collection.Status.Name); err != nil {
+				return fmt.Errorf("failed to delete collection (%s): %w", collection.Status.Name, err)
+			}
+			log.Info("Deleted collection.", "collection", collection.Status.Name)
+		} else {
+			log.Info("Collection did not appear to exist.", "collection", collection.Status.Name)
+		}
 	} else if collection.Spec.RemovalPolicy == "retain" {
 		log.Info("Retaining collection: %s", collection.Status.Name)
 	} else {

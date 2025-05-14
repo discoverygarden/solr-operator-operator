@@ -23,7 +23,7 @@ type authentication struct {
 }
 
 type getUsersResp struct {
-	ResponseHeader responseHeader `json:"responseHeader"`
+	responseHeader `json:"responseHeader"`
 	Enabled        bool           `json:"authentication.enabled"`
 	Authentication authentication `json:"authentication"`
 }
@@ -34,9 +34,14 @@ type authorization struct {
 }
 
 type getAuthResp struct {
-	ResponseHeader responseHeader `json:"responseHeader"`
-	Enabled        bool           `json:"authorization.enabled"`
-	Authorization  authorization  `json:"authorization"`
+	responseHeader `json:"responseHeader"`
+	Enabled        bool          `json:"authorization.enabled"`
+	Authorization  authorization `json:"authorization"`
+}
+
+type listCollectionsResp struct {
+	responseHeader `json:"responseHeader"`
+	Collections    []string `json:"collections"`
 }
 
 type credInfo struct {
