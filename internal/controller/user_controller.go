@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/apache/solr-operator/api/v1beta1"
-	"github.com/discoverygarden/solr-user-operator/api/v1alpha1"
+	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
 	"github.com/discoverygarden/solr-user-operator/internal/controller/solr"
 	// +kubebuilder:scaffold:imports
 )
@@ -81,7 +81,7 @@ const (
 func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	var user v1alpha1.User
+	var user solrv1alpha1.User
 	if err := r.Get(ctx, req.NamespacedName, &user); err != nil {
 		log.Error(err, "Unable to get User")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -170,7 +170,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 }
 
-func getNamespace(u v1.ObjectMeta, ref v1alpha1.ObjectRef) string {
+func getNamespace(u v1.ObjectMeta, ref solrv1alpha1.ObjectRef) string {
 	if ref.Namespace != "" {
 		return ref.Namespace
 	} else {
@@ -178,7 +178,7 @@ func getNamespace(u v1.ObjectMeta, ref v1alpha1.ObjectRef) string {
 	}
 }
 
-func (r *UserReconciler) getSecret(ctx context.Context, user *v1alpha1.User, try_create bool) (*corev1.Secret, error) {
+func (r *UserReconciler) getSecret(ctx context.Context, user *solrv1alpha1.User, try_create bool) (*corev1.Secret, error) {
 	log := logf.FromContext(ctx)
 	ref := user.Spec.Secret.ToObjectKey()
 	ref.Namespace = getNamespace(user.ObjectMeta, user.Spec.Secret.ObjectRef)
@@ -250,7 +250,7 @@ type Credentials struct {
 	Endpoint string `spec_field_name:"EndpointKey" condition:"SecretEndpoint"`
 }
 
-func (c *Credentials) getSecretKey(cred_field_name string, user *v1alpha1.User) (*string, error) {
+func (c *Credentials) getSecretKey(cred_field_name string, user *solrv1alpha1.User) (*string, error) {
 	ref_type := reflect.TypeOf(user.Spec.Secret)
 	cred_type := reflect.TypeOf(*c)
 	field, ok := cred_type.FieldByName(cred_field_name)
@@ -269,7 +269,7 @@ func (c *Credentials) getSecretKey(cred_field_name string, user *v1alpha1.User) 
 	return &secret_key, nil
 }
 
-func (c *Credentials) extractFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) {
+func (c *Credentials) extractFromSecret(ctx context.Context, user *solrv1alpha1.User, secret *corev1.Secret) {
 	log := logf.FromContext(ctx)
 	cred_type := reflect.TypeOf(*c)
 	for index, value := range reflect.VisibleFields(cred_type) {
@@ -314,7 +314,7 @@ func (c *Credentials) extractFromSecret(ctx context.Context, user *v1alpha1.User
 	}
 }
 
-func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1alpha1.User, secret *corev1.Secret) *Credentials {
+func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *solrv1alpha1.User, secret *corev1.Secret) *Credentials {
 	log := logf.FromContext(ctx)
 	var creds Credentials
 
@@ -337,7 +337,7 @@ func (r *UserReconciler) getCredentialsFromSecret(ctx context.Context, user *v1a
 	return &creds
 }
 
-func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.ClientInterface, user *v1alpha1.User, ensure_exists_state bool) error {
+func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.ClientInterface, user *solrv1alpha1.User, ensure_exists_state bool) error {
 	log := logf.FromContext(ctx)
 
 	secret, err := r.getSecret(ctx, user, ensure_exists_state)
@@ -471,7 +471,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 	return nil
 }
 
-func (r *UserReconciler) reconcileSecret(ctx context.Context, user *v1alpha1.User, creds *Credentials, secret *corev1.Secret, solrClient solr.ClientInterface) (bool, error) {
+func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1.User, creds *Credentials, secret *corev1.Secret, solrClient solr.ClientInterface) (bool, error) {
 	log := logf.FromContext(ctx)
 
 	secret_conditions := make([]v1.Condition, 0)
@@ -593,7 +593,7 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *v1alpha1.Use
 	return secret_dirty, nil
 }
 
-func (r *UserReconciler) reconcileObserveUser(ctx context.Context, user *v1alpha1.User, creds *Credentials, solrClient solr.ClientInterface) error {
+func (r *UserReconciler) reconcileObserveUser(ctx context.Context, user *solrv1alpha1.User, creds *Credentials, solrClient solr.ClientInterface) error {
 	log := logf.FromContext(ctx)
 
 	user_exists, err := solrClient.CheckUserExistence(creds.Username)
@@ -676,7 +676,7 @@ func (r *UserReconciler) reconcileObserveUser(ctx context.Context, user *v1alpha
 // SetupWithManager sets up the controller with the Manager.
 func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.User{}).
+		For(&solrv1alpha1.User{}).
 		Named("user").
 		WatchesMetadata(
 			&corev1.Secret{},
@@ -684,7 +684,7 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				log := logf.FromContext(ctx)
 				secret := obj.(*v1.PartialObjectMetadata)
 
-				var list v1alpha1.UserList
+				var list solrv1alpha1.UserList
 				requests := []reconcile.Request{}
 				err := r.List(ctx, &list)
 				if err != nil {
@@ -710,7 +710,7 @@ func (r *UserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				log := logf.FromContext(ctx)
 				solr_cloud := obj.(*v1.PartialObjectMetadata)
 
-				var list v1alpha1.UserList
+				var list solrv1alpha1.UserList
 				requests := []reconcile.Request{}
 				err := r.List(ctx, &list)
 				if err != nil {
