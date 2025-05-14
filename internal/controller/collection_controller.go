@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/discoverygarden/solr-user-operator/api/v1alpha1"
 	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
 )
 
@@ -66,7 +65,7 @@ const (
 func (r *CollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	var collection v1alpha1.Collection
+	var collection solrv1alpha1.Collection
 
 	if err := r.Get(ctx, req.NamespacedName, &collection); err != nil {
 		log.Error(err, "Unable to get Collection")
@@ -179,7 +178,7 @@ func (r *CollectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *CollectionReconciler) getConfigMap(ctx context.Context, collection *v1alpha1.Collection) (*corev1.ConfigMap, error) {
+func (r *CollectionReconciler) getConfigMap(ctx context.Context, collection *solrv1alpha1.Collection) (*corev1.ConfigMap, error) {
 	var config_map corev1.ConfigMap
 
 	if err := r.Get(ctx, collection.Spec.Map.ToObjectKey(), &config_map); err != nil {
@@ -189,7 +188,7 @@ func (r *CollectionReconciler) getConfigMap(ctx context.Context, collection *v1a
 	}
 }
 
-func (r *CollectionReconciler) observeCollection(ctx context.Context, collection *v1alpha1.Collection) {
+func (r *CollectionReconciler) observeCollection(ctx context.Context, collection *solrv1alpha1.Collection) {
 	log := logf.FromContext(ctx)
 
 	if config_map, err := r.getConfigMap(ctx, collection); err != nil {
@@ -249,7 +248,7 @@ func (r *CollectionReconciler) observeCollection(ctx context.Context, collection
 	r.checkMapStatus(collection)
 }
 
-func (r *CollectionReconciler) checkMapStatus(collection *v1alpha1.Collection) {
+func (r *CollectionReconciler) checkMapStatus(collection *solrv1alpha1.Collection) {
 	available_conditions := []string{
 		conditionCollectionConfigMapExists,
 		conditionCollectionConfigMapHasCollection,
@@ -275,12 +274,12 @@ func (r *CollectionReconciler) checkMapStatus(collection *v1alpha1.Collection) {
 	}
 }
 
-func (r *CollectionReconciler) createCollection(ctx context.Context, collection *v1alpha1.Collection) error {
+func (r *CollectionReconciler) createCollection(ctx context.Context, collection *solrv1alpha1.Collection) error {
 	// XXX: Not meaningfully different, here?
 	return r.updateCollection(ctx, collection)
 }
 
-func (r *CollectionReconciler) updateCollection(ctx context.Context, collection *v1alpha1.Collection) error {
+func (r *CollectionReconciler) updateCollection(ctx context.Context, collection *solrv1alpha1.Collection) error {
 	log := logf.FromContext(ctx)
 	var config_map corev1.ConfigMap
 	if !meta.IsStatusConditionTrue(collection.Status.Conditions, conditionCollectionConfigMapExists) {
@@ -354,7 +353,7 @@ func (r *CollectionReconciler) updateCollection(ctx context.Context, collection 
 	return nil
 }
 
-func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection *v1alpha1.Collection) error {
+func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection *solrv1alpha1.Collection) error {
 	log := logf.FromContext(ctx)
 
 	if collection.Status.Name == "" {
