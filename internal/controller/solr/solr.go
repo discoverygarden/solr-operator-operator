@@ -12,7 +12,7 @@ import (
 	"slices"
 
 	"github.com/apache/solr-operator/api/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -157,10 +157,9 @@ func (c *Client) CheckUser(username string, password string) (bool, error) {
 }
 
 func (c *Client) deferredClose(to_close io.Closer) {
-	log.FromContext(c.Context)
 	err := to_close.Close()
 	if err != nil {
-		log.Log.Error(err, "Error closing.")
+		logf.FromContext(c.Context).Error(err, "Error closing.")
 	}
 }
 
