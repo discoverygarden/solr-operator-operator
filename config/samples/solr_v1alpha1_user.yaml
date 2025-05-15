@@ -1,0 +1,10 @@
+apiVersion: solr.dgicloud.com/v1alpha1
+kind: User
+metadata:
+  labels:
+    app.kubernetes.io/name: solr-user-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: user-sample
+spec:
+  solrCloudRef:
+    name: solr
