@@ -10,6 +10,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
   - secrets
   verbs:
   - create
@@ -22,6 +23,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps/status
   - secrets/status
   verbs:
   - get
@@ -36,6 +38,7 @@ rules:
 - apiGroups:
   - solr.dgicloud.com
   resources:
+  - collections
   - users
   verbs:
   - create
@@ -48,12 +51,14 @@ rules:
 - apiGroups:
   - solr.dgicloud.com
   resources:
+  - collections/finalizers
   - users/finalizers
   verbs:
   - update
 - apiGroups:
   - solr.dgicloud.com
   resources:
+  - collections/status
   - users/status
   verbs:
   - get
