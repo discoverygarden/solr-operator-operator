@@ -434,13 +434,20 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 				Message: "Added roles.",
 			})
 		}
-		if secret_dirty && meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretAvailable) {
-			if err := r.Update(ctx, secret); err != nil {
-				log.Error(err, "Failed to update secret.")
+		if secret_dirty {
+			if meta.IsStatusConditionTrue(user.Status.Conditions, conditionSecretAvailable) {
+				if err := r.Update(ctx, secret); err != nil {
+					log.Error(err, "Failed to update secret.")
+				} else {
+					log.Info("Updated secret.")
+					// secret_dirty = false
+				}
 			} else {
-				log.Info("Updated secret.")
-				// secret_dirty = false
+				log.Info("Secret dirty but not available to be updated?")
+				return fmt.Errorf("secret dirty but not available to be updated")
 			}
+		} else {
+			log.Info("Secret clean; no need to update.")
 		}
 	} else {
 		// Expecting subresources/status to go away along with the resource
@@ -537,7 +544,7 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1
 
 	// TODO: Reconcile endpoint info on secret.
 	{
-		endpoint := solrClient.GetSolrCloud().InternalCommonUrl(true)
+		endpoint := v1beta1.InternalURLForCloud(solrClient.GetSolrCloud())
 		key, err := creds.getSecretKey("Endpoint", user)
 		if err != nil {
 			log.Error(err, "Failed to get secret key for endpoint.")
@@ -574,7 +581,7 @@ func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1
 		}
 		creds.Hostname = parsed_url.Host
 		if !slices.Equal(secret.Data[*key], []byte(parsed_url.Hostname())) {
-			secret.Data[*key] = []byte(endpoint)
+			secret.Data[*key] = []byte(parsed_url.Hostname())
 			secret_dirty = true
 			secret_conditions = append(secret_conditions, v1.Condition{
 				Type:    conditionSecretEndpointHostname,
