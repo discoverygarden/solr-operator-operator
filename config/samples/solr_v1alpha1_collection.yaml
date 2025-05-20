@@ -1,0 +1,9 @@
+apiVersion: solr.dgicloud.com/v1alpha1
+kind: Collection
+metadata:
+  labels:
+    app.kubernetes.io/name: solr-user-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: collection-sample
+spec:
+  # TODO(user): Add fields here

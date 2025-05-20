@@ -36,6 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	scv1beta1 "github.com/apache/solr-operator/api/v1beta1"
+
+	solrv1alpha1 "github.com/discoverygarden/solr-user-operator/api/v1alpha1"
+	"github.com/discoverygarden/solr-user-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -46,7 +51,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(scv1beta1.AddToScheme(scheme))
 
+	utilruntime.Must(solrv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -198,6 +205,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controller.UserReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		SolrClientAware: controller.SolrClientAware{
+			Client: mgr.GetClient(),
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "User")
+		os.Exit(1)
+	}
+	if err = (&controller.CollectionReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		SolrClientAware: controller.SolrClientAware{
+			Client: mgr.GetClient(),
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Collection")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {
