@@ -380,7 +380,7 @@ func (r *CollectionReconciler) deleteCollection(ctx context.Context, collection 
 			log.Info("Collection did not appear to exist.", "collection", collection.Status.Name)
 		}
 	} else if collection.Spec.RemovalPolicy == "retain" {
-		log.Info("Retaining collection: %s", collection.Status.Name)
+		log.Info("Retaining collection.", "collection", collection.Status.Name)
 	} else {
 		return fmt.Errorf("unrecognized removal policy %s; expecting one of delete or retain", collection.Spec.RemovalPolicy)
 	}
