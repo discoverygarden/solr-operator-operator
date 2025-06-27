@@ -4,6 +4,7 @@ name: Build image from version tag
 permissions:
   id-token: write
   contents: read
+  packages: write
 on:
   push:
     # XXX: Tags pushed via actions (i.e., auto-semver) are not able to trigger additional workflows;
@@ -21,8 +22,9 @@ on:
 jobs:
   build:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
-    uses: discoverygarden/docker-image-reusable-workflows/.github/workflows/build-image.yml@v1
+    uses: discoverygarden/docker-image-reusable-workflows/.github/workflows/build-image.yml@v2
     secrets: inherit
     with:
       image-name: ${{ vars.DOCKER_IMAGE_NAME }}
       tag: ${{ inputs.tag }}
+
