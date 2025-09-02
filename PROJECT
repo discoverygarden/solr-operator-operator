@@ -5,6 +5,27 @@
 domain: dgicloud.com
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  helm.kubebuilder.io/v1-alpha: {}
 projectName: solr-user-operator
 repo: github.com/discoverygarden/solr-user-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: dgicloud.com
+  group: solr
+  kind: User
+  path: github.com/discoverygarden/solr-user-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: dgicloud.com
+  group: solr
+  kind: Collection
+  path: github.com/discoverygarden/solr-user-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"
