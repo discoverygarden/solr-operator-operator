@@ -7,11 +7,11 @@ Where used, should be able to:
 Pull workflows, to update them locally:
 
 ```bash
-git subtree pull --prefix=.github/workflows git@github.com:discoverygarden/docker-image-workflows.git
+git subtree pull --prefix=.github/workflows git@github.com:discoverygarden/docker-image-workflows.git main
 ```
 
 Push workflows, to update the remote (and subsequently pull them into the other image-building repos?):
 
 ```bash
-git subtree push --prefix=.github/workflows git@github.com:discoverygarden/docker-image-workflows.git
+git subtree push --prefix=.github/workflows git@github.com:discoverygarden/docker-image-workflows.git main
 ```
