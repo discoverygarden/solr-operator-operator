@@ -23,5 +23,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: write
     with:
       tag: ${{ needs.update.outputs.tag }}

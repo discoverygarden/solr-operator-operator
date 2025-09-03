@@ -4,6 +4,7 @@ name: Rebuild image
 permissions:
   id-token: write
   contents: read
+  packages: write
 on:
   schedule:
     - cron: '47 4 1 * *'
@@ -20,7 +21,7 @@ on:
 
 jobs:
   build:
-    uses: discoverygarden/docker-image-reusable-workflows/.github/workflows/build-image.yml@v1
+    uses: discoverygarden/docker-image-reusable-workflows/.github/workflows/build-image.yml@v2
     secrets: inherit
     with:
       env: ${{ inputs.env || github.event_name == 'pull_request' && 'dev' || 'prod' }}
