@@ -4,7 +4,7 @@ controllerManager:
   container:
     image:
       repository: ghcr.io/discoverygarden/solr-operator-operator
-      tag: latest
+      tag: 1.0.0
     args:
       - "--leader-elect"
       - "--metrics-bind-address=:8443"
