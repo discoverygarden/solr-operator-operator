@@ -359,7 +359,7 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 		return nil
 	}
 
-	secret_dirty, err := r.reconcileSecret(ctx, user, creds, secret, solrClient)
+	secret_dirty, err := r.reconcileSecret(ctx, user, creds, secret, solrClient, ensure_exists_state)
 	if err != nil {
 		log.Error(err, "Failed to reconcile secret.")
 		return fmt.Errorf("failed to reconcile secret: %w", err)
@@ -477,8 +477,20 @@ func (r *UserReconciler) reconcileUser(ctx context.Context, solrClient solr.Clie
 	return nil
 }
 
-func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1.User, creds *Credentials, secret *corev1.Secret, solrClient solr.ClientInterface) (bool, error) {
+func (r *UserReconciler) reconcileSecret(ctx context.Context, user *solrv1alpha1.User, creds *Credentials, secret *corev1.Secret, solrClient solr.ClientInterface, ensure_exists_state bool) (bool, error) {
 	log := logf.FromContext(ctx)
+
+	if secret == nil {
+		if !ensure_exists_state {
+			// During deletion, we can be permssive and not strictly require
+			// the secret, should the secret have already been deleted.
+			return false, nil
+		} else {
+			// ... otherwise, we rather more strongly require the secret we
+			// have been invoked to reconcile.
+			return false, fmt.Errorf("cannot reconcile secret")
+		}
+	}
 
 	secret_conditions := make([]v1.Condition, 0)
 	secret_dirty := false
