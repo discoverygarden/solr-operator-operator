@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   solr-user-operator:
   - apiVersion: v2
+    appVersion: 1.0.2
+    created: "2026-10-20T12:54:48.462707101Z"
+    description: A Helm chart to distribute the project solr-user-operator
+    digest: 668dfe7a1d6a4ac0af51114028017a060e096abedbcf0e3e8819262b9c4d3f01
+    name: solr-user-operator
+    type: application
+    urls:
+    - solr-user-operator-1.0.2.tgz
+    version: 1.0.2
+  - apiVersion: v2
     appVersion: 1.0.1
     created: "2026-10-19T20:03:07.732200616Z"
     description: A Helm chart to distribute the project solr-user-operator
@@ -31,4 +41,4 @@ entries:
     urls:
     - solr-user-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-10-19T20:03:07.732213901Z"
+generated: "2026-10-20T12:54:48.462723001Z"
