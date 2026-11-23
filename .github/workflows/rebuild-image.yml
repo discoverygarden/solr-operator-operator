@@ -26,3 +26,17 @@ jobs:
     with:
       env: ${{ inputs.env || github.event_name == 'pull_request' && 'dev' || 'prod' }}
       image-name: ${{ vars.DOCKER_IMAGE_NAME }}
+
+  # GitHub disables scheduled workflows in public repos after 60 days without
+  # repository activity (state: disabled_inactivity). Re-enabling the workflow
+  # via the API from within a scheduled run resets that timer.
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Reset the scheduled-workflow inactivity timer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "/repos/${{ github.repository }}/actions/workflows/rebuild-image.yml/enable"
