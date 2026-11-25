@@ -2,8 +2,6 @@ module github.com/discoverygarden/solr-user-operator
 
 go 1.26.0
 
-godebug default=go1.23
-
 require (
 	github.com/apache/solr-operator v0.9.1
 	github.com/onsi/ginkgo/v2 v2.22.0
